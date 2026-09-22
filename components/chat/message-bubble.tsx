@@ -105,9 +105,31 @@ export function MessageBubble({ message, isStreaming = false, onActionClick }: M
             <span className="font-semibold text-emerald-800">ראמי מסארוה</span>
           ) : (
             <span className="font-semibold text-stone-700 flex items-center gap-1">
-              <span>נועה AI</span>
+              <span
+                style={
+                  message.id === "OIhXf4iq5qKDJYMSSYQd"
+                    ? {
+                        color: "#f6f5f5",
+                        fontWeight: "bold",
+                        fontSize: "18px",
+                        textAlign: "right",
+                      }
+                    : undefined
+                }
+              >
+                נועה AI
+              </span>
               <span className="text-red-500 text-[11px]">❤️</span>
-              <span className="text-[10px] text-stone-400 font-normal hidden sm:inline">| ח. סבן</span>
+              <span
+                className="text-[10px] text-stone-400 font-normal hidden sm:inline"
+                style={
+                  message.id === "OIhXf4iq5qKDJYMSSYQd"
+                    ? { color: "#f38120" }
+                    : undefined
+                }
+              >
+                | ח. סבן
+              </span>
             </span>
           )}
           <span className="text-stone-300 text-[10px]">•</span>
@@ -117,8 +139,23 @@ export function MessageBubble({ message, isStreaming = false, onActionClick }: M
               className="text-[11px] font-medium text-stone-500 flex items-center gap-1 tracking-tight"
               title={fullDateTime}
             >
-              <Clock className="w-3 h-3 text-stone-400 inline shrink-0" />
-              <span>{timeFormatted}</span>
+              <Clock
+                className="w-3 h-3 text-stone-400 inline shrink-0"
+                style={
+                  message.id === "OIhXf4iq5qKDJYMSSYQd"
+                    ? { color: "#eb9044" }
+                    : undefined
+                }
+              />
+              <span
+                style={
+                  message.id === "OIhXf4iq5qKDJYMSSYQd"
+                    ? { color: "#eda670" }
+                    : undefined
+                }
+              >
+                {timeFormatted}
+              </span>
             </time>
           )}
           {message.device && (

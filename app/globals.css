@@ -591,3 +591,22 @@ div#message-item-OIhXf4iq5qKDJYMSSYQd > div:nth-of-type(2) > div:nth-of-type(3) 
 div#message-item-OIhXf4iq5qKDJYMSSYQd > div:nth-of-type(2) > div:nth-of-type(3) > svg:nth-of-type(1) {
   color: #f9811c;
 }
+
+div#message-item-OIhXf4iq5qKDJYMSSYQd > div:nth-of-type(2) > div:nth-of-type(1) > time:nth-of-type(1) > span:nth-of-type(1) {
+  color: #eda670;
+}
+
+div#message-item-OIhXf4iq5qKDJYMSSYQd > div:nth-of-type(2) > div:nth-of-type(1) > time:nth-of-type(1) > svg:nth-of-type(1) {
+  color: #eb9044;
+}
+
+div#message-item-OIhXf4iq5qKDJYMSSYQd > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(1) > span:nth-of-type(3) {
+  color: #f38120;
+}
+
+div#message-item-OIhXf4iq5qKDJYMSSYQd > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(1) > span:nth-of-type(1) {
+  color: #f6f5f5;
+  font-weight: bold;
+  font-size: 18px;
+  text-align: right;
+}
