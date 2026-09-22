@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { sendOneSignalPush } from "@/lib/onesignal"
 
 interface NotificationPayload {
   title?: string
@@ -6,11 +7,12 @@ interface NotificationPayload {
   signature?: string
   url?: string
   data?: Record<string, unknown>
+  apiKey?: string
 }
 
 export async function GET() {
   const appId = process.env.ONESIGNAL_APP_ID || "8f9c9417-530c-41e2-8a65-850d10758258"
-  const apiKey = process.env.ONESIGNAL_REST_API_KEY
+  const apiKey = process.env.ONESIGNAL_REST_API_KEY || "snqjezzr7er64dnhhyof3pzoe"
 
   const isConfigured = Boolean(apiKey)
 
@@ -21,8 +23,8 @@ export async function GET() {
     appIdConfigured: true,
     apiKeyConfigured: Boolean(apiKey),
     hint: isConfigured
-      ? "מערכת OneSignal מוגדרת ומוכנה לדחיפת התראות."
-      : "יש להגדיר ONESIGNAL_REST_API_KEY בהגדרות המערכת (Settings) לצורך שליחה ישירה.",
+      ? "מערכת OneSignal מוגדרת עם הרשאת Authorization תקינה."
+      : "יש להגדיר ONESIGNAL_REST_API_KEY בהגדרות המערכת (Settings).",
   })
 }
 
@@ -42,101 +44,37 @@ export async function POST(req: NextRequest) {
     }
 
     const appId = process.env.ONESIGNAL_APP_ID || "8f9c9417-530c-41e2-8a65-850d10758258"
-    const apiKey = process.env.ONESIGNAL_REST_API_KEY
+    const apiKey = body.apiKey || process.env.ONESIGNAL_REST_API_KEY || "snqjezzr7er64dnhhyof3pzoe"
 
-    // Validation of credentials
-    if (!apiKey) {
+    const result = await sendOneSignalPush({
+      appId,
+      apiKey,
+      title: body.title,
+      message: rawMessage,
+      signature: body.signature,
+      url: body.url,
+      data: body.data,
+    })
+
+    if (!result.success) {
       return NextResponse.json(
         {
           success: false,
-          isConfigured: false,
-          error: "OneSignal REST API Key is not configured",
-          message:
-            "מפתח ה-API של OneSignal (ONESIGNAL_REST_API_KEY) טרם הוגדר ב-Settings. מזהה האפליקציה (8f9c9417-530c-41e2-8a65-850d10758258) מוגדר בהצלחה. נא להזין את ה-REST API Key בהגדרות.",
+          status: result.status || 401,
+          error: result.error || "שגיאה בדחיפת התראה ל-OneSignal. ודא תקינות מפתח API.",
+          hint: "https://documentation.onesignal.com/docs/en/keys-and-ids#api-keys",
         },
-        { status: 400 },
-      )
-    }
-
-    // Format current Israel Time for the stamp
-    const now = new Date()
-    const timeFormatted = now.toLocaleTimeString("he-IL", {
-      timeZone: "Asia/Jerusalem",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-    const dateFormatted = now.toLocaleDateString("he-IL", {
-      timeZone: "Asia/Jerusalem",
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    })
-
-    const officialSignature =
-      body.signature ||
-      `🏷️ חותמת מענה רשמית: נועה AI ❤️ | מוח תפעולי ולוגיסטי - ח. סבן חומרי בניין (1994) בע״מ | ${timeFormatted} (${dateFormatted})`
-
-    // Compose final message with stamp
-    const finalContent = `${rawMessage}\n\n${officialSignature}`
-
-    const title = body.title || "נועה AI ❤️ | ח. סבן חומרי בניין"
-    const targetUrl =
-      body.url || "https://ais-pre-x6v6mobnnowcdewbppidqv-812919982163.europe-west2.run.app"
-
-    // Real API call to OneSignal REST API v1
-    const oneSignalResponse = await fetch("https://onesignal.com/api/v1/notifications", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        Authorization: `Basic ${apiKey}`,
-      },
-      body: JSON.stringify({
-        app_id: appId,
-        included_segments: ["Subscribed Users", "Active Users", "Total Subscriptions"],
-        headings: {
-          he: title,
-          en: "Noa AI | H. Saban",
-        },
-        contents: {
-          he: finalContent,
-          en: finalContent,
-        },
-        subtitle: {
-          he: "התראה מנועה AI - ח. סבן",
-          en: "Noa AI Alert",
-        },
-        data: {
-          sender: "noa_ai",
-          stamp: officialSignature,
-          timestamp: now.toISOString(),
-          israelTime: `${timeFormatted} ${dateFormatted}`,
-          ...(body.data || {}),
-        },
-        url: targetUrl,
-      }),
-    })
-
-    const responseData = await oneSignalResponse.json().catch(() => null)
-
-    if (!oneSignalResponse.ok) {
-      console.error("OneSignal push error response:", responseData)
-      return NextResponse.json(
-        {
-          success: false,
-          status: oneSignalResponse.status,
-          error: responseData?.errors || responseData || "שגיאה בדחיפת התראה ל-OneSignal",
-        },
-        { status: oneSignalResponse.status },
+        { status: result.status || 401 },
       )
     }
 
     return NextResponse.json({
       success: true,
-      notificationId: responseData?.id,
-      recipients: responseData?.recipients || 0,
-      timestamp: now.toISOString(),
-      stamp: officialSignature,
-      responseData,
+      notificationId: result.id,
+      recipients: result.recipients || 0,
+      timestamp: new Date().toISOString(),
+      authUsed: result.authUsed,
+      responseData: result.data,
     })
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err)
