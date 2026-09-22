@@ -14,11 +14,12 @@ interface MessageListProps {
   error: string | null
   onRetry: () => void
   isLoaded: boolean // Added isLoaded prop to know when localStorage is loaded
+  onSendMessage?: (text: string) => void
 }
 
 const LAUNCH_SOUND_URL = "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/launch-SUi0itAGHr1wtvdDYYG5bzFLsIYHtP.mp3"
 
-export function MessageList({ messages, isStreaming, error, onRetry, isLoaded }: MessageListProps) {
+export function MessageList({ messages, isStreaming, error, onRetry, isLoaded, onSendMessage }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
@@ -138,16 +139,40 @@ export function MessageList({ messages, isStreaming, error, onRetry, isLoaded }:
     >
       {/* Empty state */}
       {messages.length === 0 && !error && !isStreaming && (
-        <div className="flex flex-col items-center justify-center h-full text-center text-stone-400">
-          <div className={`mb-4 ${hasAnimated ? "orb-intro" : ""}`}>
-            <AnimatedOrb size={128} />
+        <div className="flex flex-col items-center justify-center h-full text-center text-stone-600 px-4" dir="rtl">
+          <div className={`mb-4 relative ${hasAnimated ? "orb-intro" : ""}`}>
+            <AnimatedOrb size={120} />
+            <span className="absolute -bottom-1 -left-1 text-2xl select-none filter drop-shadow">❤️</span>
           </div>
-          <p className={`text-lg font-medium text-gray-500 ${hasAnimated ? "text-blur-intro" : ""}`}>
-            Hi, my name is Jarvis
+          <h1 className={`text-2xl font-bold text-stone-800 ${hasAnimated ? "text-blur-intro" : ""}`}>
+            שלום ראמי, אני נועה AI ❤️
+          </h1>
+          <p className={`text-sm mt-1 text-stone-600 max-w-md ${hasAnimated ? "text-blur-intro-delay" : ""}`}>
+            השותפה והמוח הלוגיסטי-תפעולי שלך בחברת <strong className="text-stone-800 font-semibold">״ח. סבן חומרי בניין (1994) בע״מ״</strong>
           </p>
-          <p className={`text-sm mt-1 text-gray-400 ${hasAnimated ? "text-blur-intro-delay" : ""}`}>
-            Send a message to begin chatting with the AI assistant
+          <p className="text-xs text-stone-600 mt-1 max-w-sm">
+            ערוץ השיחה הפרטי לניהול משימות שוטף, סידור עבודה, סיעור מוחות והחלטות אסטרטגיות.
           </p>
+
+          {/* Quick starter chips */}
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-6 max-w-lg">
+            {[
+              { icon: "📋", text: "סידור עבודה יומי לנהגים ולמשאיות" },
+              { icon: "🏗️", text: "בדיקת סטטוס מלאי חומרי בניין והזמנות רכש" },
+              { icon: "💡", text: "סיעור מוחות לפיתוח וייעול לוגיסטי" },
+              { icon: "⏱️", text: "מעקב אספקות וסגירת קצוות פתוחים" },
+            ].map((item, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => onSendMessage?.(item.text)}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/90 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 border border-stone-200/80 text-stone-700 text-xs font-semibold shadow-xs transition-all cursor-pointer active:scale-95"
+              >
+                <span>{item.icon}</span>
+                <span>{item.text}</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -165,6 +190,7 @@ export function MessageList({ messages, isStreaming, error, onRetry, isLoaded }:
             key={message.id}
             message={message}
             isStreaming={isStreaming && message.role === "assistant" && message === lastMessage}
+            onActionClick={onSendMessage}
           />
         ))}
 

@@ -54,7 +54,7 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
         recognitionRef.current = new SpeechRecognition()
         recognitionRef.current.continuous = true
         recognitionRef.current.interimResults = true
-        recognitionRef.current.lang = "en-US"
+        recognitionRef.current.lang = "he-IL"
 
         recognitionRef.current.onresult = (event: any) => {
           let newFinalText = ""
@@ -245,11 +245,12 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
                 handleInput()
               }}
               onKeyDown={handleKeyDown}
-              placeholder={isRecording ? "Listening..." : "Type a message... (Shift+Enter for new line)"}
+              placeholder={isRecording ? "מקשיבה לך ראמי..." : "כתוב הודעה לנועה... (Shift+Enter לשורה חדשה)"}
               disabled={isStreaming || disabled}
               rows={1}
+              dir="auto"
               className={cn(
-                "flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-stone-800 placeholder:text-stone-400",
+                "flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-stone-800 placeholder:text-stone-400 text-right",
                 "focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed",
                 "max-h-[56px] overflow-y-auto",
               )}

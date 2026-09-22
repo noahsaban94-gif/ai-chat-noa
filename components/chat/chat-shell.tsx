@@ -195,18 +195,41 @@ export function ChatShell() {
       {/* Semi-transparent Thinking Video Background & Controls */}
       <VideoBackground isStreaming={isStreaming} />
 
-      <Button
-        onClick={clearChat}
-        variant="ghost"
-        size="icon"
-        className="absolute top-4 left-4 z-20 h-10 w-10 rounded-full bg-zinc-100/90 hover:bg-zinc-200 text-stone-600 backdrop-blur-xs"
-        aria-label="Reset chat"
-      >
-        <MessageSquareDashed className="w-5 h-5" />
-      </Button>
+      {/* Top Header Bar */}
+      <header className="absolute top-3 left-4 right-4 z-20 flex items-center justify-between pointer-events-none" dir="rtl">
+        <div className="flex items-center gap-2 pointer-events-auto bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-stone-200/60 shadow-xs">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-xs font-bold text-stone-800">נועה AI</span>
+          <span className="text-red-500 text-xs">❤️</span>
+          <span className="text-stone-300 text-xs">|</span>
+          <span className="text-xs font-medium text-stone-600 hidden sm:inline">ח. סבן חומרי בניין (1994) בע״מ</span>
+          <span className="text-stone-300 text-xs hidden sm:inline">|</span>
+          <span className="text-xs font-semibold text-emerald-800">ראמי מסארוה</span>
+        </div>
+
+        <div className="flex items-center gap-2 pointer-events-auto">
+          <Button
+            onClick={clearChat}
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-full bg-white/80 hover:bg-white text-stone-600 backdrop-blur-md border border-stone-200/60 shadow-xs"
+            aria-label="Reset chat"
+            title="איפוס שיחה"
+          >
+            <MessageSquareDashed className="w-4 h-4" />
+          </Button>
+        </div>
+      </header>
 
       <div className="relative z-10 h-full w-full">
-        <MessageList messages={messages} isStreaming={isStreaming} error={error} onRetry={retry} isLoaded={isLoaded} />
+        <MessageList
+          messages={messages}
+          isStreaming={isStreaming}
+          error={error}
+          onRetry={retry}
+          isLoaded={isLoaded}
+          onSendMessage={sendMessage}
+        />
       </div>
 
       <Composer

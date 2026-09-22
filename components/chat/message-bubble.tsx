@@ -10,6 +10,7 @@ import { AnimatedOrb } from "./animated-orb"
 interface MessageBubbleProps {
   message: Message
   isStreaming?: boolean
+  onActionClick?: (action: string) => void
 }
 
 // Format time for display
@@ -17,13 +18,13 @@ function formatTime(date: Date): string {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 }
 
-export function MessageBubble({ message, isStreaming = false }: MessageBubbleProps) {
+export function MessageBubble({ message, isStreaming = false, onActionClick }: MessageBubbleProps) {
   const isUser = message.role === "user"
 
   return (
     <div
       className={cn(
-        "flex max-w-[90%] md:max-w-[80%] gap-2",
+        "flex max-w-[95%] md:max-w-[85%] gap-2.5",
         isUser
           ? "ml-auto flex-row-reverse user-message-enter"
           : "mr-auto animate-in fade-in slide-in-from-bottom-2 duration-300 items-end",
@@ -32,8 +33,8 @@ export function MessageBubble({ message, isStreaming = false }: MessageBubblePro
       {/* Avatar */}
       <div
         className={cn(
-          "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
-          isUser ? "bg-white" : "bg-emerald-600",
+          "w-8 h-8 rounded-full flex items-center justify-center shrink-0 relative",
+          isUser ? "bg-white border border-emerald-500/20" : "bg-emerald-600",
           !isUser && isStreaming && "sticky bottom-4 self-end transition-all duration-300",
         )}
         style={{
@@ -42,21 +43,38 @@ export function MessageBubble({ message, isStreaming = false }: MessageBubblePro
         }}
         aria-hidden="true"
       >
-        {isUser ? <User className="w-4 h-4 text-stone-800" /> : <AnimatedOrb className="w-8 h-8 shrink-0" />}
+        {isUser ? (
+          <span className="text-xs font-bold text-emerald-700">ר</span>
+        ) : (
+          <>
+            <AnimatedOrb className="w-8 h-8 shrink-0" />
+            <span className="absolute -top-1 -right-1 text-[10px] select-none leading-none">❤️</span>
+          </>
+        )}
       </div>
 
       {/* Message content */}
-      <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
-        {/* Role label (optional, shown on larger screens) */}
-        <span className="text-xs text-stone-400 mb-1 hidden sm:block mt-2">{isUser ? "You" : "Assistant"}</span>
+      <div className={cn("flex flex-col", isUser ? "items-end text-right" : "items-start text-right")}>
+        {/* Role label */}
+        <span className="text-xs text-stone-400 mb-1 hidden sm:flex items-center gap-1.5 mt-2" dir="rtl">
+          {isUser ? (
+            <span className="font-semibold text-emerald-800">ראמי מסארוה</span>
+          ) : (
+            <span className="font-semibold text-stone-600 flex items-center gap-1">
+              <span>נועה AI</span>
+              <span className="text-red-500 text-[11px]">❤️</span>
+              <span className="text-[10px] text-stone-400 font-normal">| ח. סבן חומרי בניין</span>
+            </span>
+          )}
+        </span>
 
         {/* Bubble */}
         <div
           className={cn(
             "rounded-2xl border-none overflow-hidden",
             isUser
-              ? "bg-white text-stone-800 border border-stone-200 rounded-br-md"
-              : "bg-transparent text-stone-800 rounded-bl-md",
+              ? "bg-white text-stone-800 border border-stone-200 rounded-br-md shadow-xs"
+              : "bg-white/70 backdrop-blur-xs text-stone-800 rounded-bl-md border border-stone-200/50 p-3 shadow-xs",
           )}
           style={{
             boxShadow: isUser
@@ -92,12 +110,24 @@ export function MessageBubble({ message, isStreaming = false }: MessageBubblePro
                     />
                   </div>
                 )}
-                <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                <p
+                  className="whitespace-pre-wrap break-words text-[17px] font-bold text-[#089d0e] leading-[27px]"
+                  style={{
+                    fontSize: "17px",
+                    fontWeight: "bold",
+                    color: "#089d0e",
+                    fontFamily: "Arial",
+                    lineHeight: "27px",
+                  }}
+                >
+                  {message.content}
+                </p>
               </div>
             ) : (
               <MarkdownRenderer
                 content={message.content || " "}
                 isStreaming={isStreaming}
+                onActionClick={onActionClick}
                 className="text-[15px] font-bold [font-family:system-ui]"
               />
             )}
