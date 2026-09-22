@@ -1,15 +1,20 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { usePWAInstall } from "@/hooks/use-pwa-install"
 import { Download, Share2, PlusSquare, X } from "lucide-react"
 
 export const PWAInstallButton: React.FC = () => {
+  const [mounted, setMounted] = useState(false)
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall()
   const [showIOSGuide, setShowIOSGuide] = useState(false)
 
-  // Hide if already running in standalone PWA mode
-  if (isInstalled) {
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Hide on server, during initial hydration, or if already running in standalone PWA mode
+  if (!mounted || isInstalled) {
     return null
   }
 

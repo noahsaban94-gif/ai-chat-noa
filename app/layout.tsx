@@ -79,18 +79,57 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="נועה AI" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+        {/* OneSignal Web Push - safely initialized only on configured origin */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              window.OneSignalDeferred = window.OneSignalDeferred || [];
-              OneSignalDeferred.push(async function(OneSignal) {
-                await OneSignal.init({
-                  appId: "8f9c9417-530c-41e2-8a65-850d10758258",
-                  allowLocalhostAsSecureOrigin: true,
-                  notifyButton: { enable: false }
-                });
-              });
+              (function() {
+                try {
+                  // Suppress origin mismatch errors from OneSignal on preview or dev URLs
+                  window.addEventListener("error", function(e) {
+                    if (e && e.message && e.message.indexOf("Can only be used on") !== -1) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      return true;
+                    }
+                  }, true);
+
+                  window.addEventListener("unhandledrejection", function(e) {
+                    var reason = e && (e.reason ? (typeof e.reason === "string" ? e.reason : (e.reason.message || "")) : "");
+                    if (reason && reason.indexOf("Can only be used on") !== -1) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      return true;
+                    }
+                  }, true);
+
+                  var hostname = window.location.hostname;
+                  var isAllowedHost = hostname === "ai-chat-noa.vercel.app" || hostname === "localhost" || hostname === "127.0.0.1";
+                  if (!isAllowedHost) {
+                    return;
+                  }
+
+                  window.OneSignalDeferred = window.OneSignalDeferred || [];
+                  var script = document.createElement("script");
+                  script.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
+                  script.defer = true;
+                  document.head.appendChild(script);
+
+                  OneSignalDeferred.push(async function(OneSignal) {
+                    try {
+                      await OneSignal.init({
+                        appId: "8f9c9417-530c-41e2-8a65-850d10758258",
+                        allowLocalhostAsSecureOrigin: true,
+                        notifyButton: { enable: false }
+                      });
+                    } catch (initErr) {
+                      // Suppress origin or permission rejection
+                    }
+                  });
+                } catch (err) {
+                  // Safe fallback
+                }
+              })();
             `,
           }}
         />

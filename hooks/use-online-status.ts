@@ -3,11 +3,15 @@
 import { useEffect, useState } from "react"
 
 export function useOnlineStatus() {
-  const [isOnline, setIsOnline] = useState(
-    typeof navigator !== "undefined" ? navigator.onLine : true
-  )
+  // Always initialize to true on initial render to prevent SSR hydration mismatch
+  const [isOnline, setIsOnline] = useState(true)
 
   useEffect(() => {
+    // Sync with actual client navigator after component mounts
+    if (typeof navigator !== "undefined") {
+      setIsOnline(navigator.onLine)
+    }
+
     const handleOnline = () => setIsOnline(true)
     const handleOffline = () => setIsOnline(false)
 

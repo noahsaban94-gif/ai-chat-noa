@@ -1,13 +1,19 @@
 "use client"
 
-import React from "react"
+import React, { useState, useEffect } from "react"
 import { useOnlineStatus } from "@/hooks/use-online-status"
 import { WifiOff } from "lucide-react"
 
 export const OfflineIndicator: React.FC = () => {
+  const [mounted, setMounted] = useState(false)
   const isOnline = useOnlineStatus()
 
-  if (isOnline) return null
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Never render on server or during initial hydration
+  if (!mounted || isOnline) return null
 
   return (
     <div
