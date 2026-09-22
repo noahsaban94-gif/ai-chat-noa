@@ -295,7 +295,7 @@ ${matchingClients.map(c => `- לקוח קומקס ${c.comaxId}: ${c.name} (${c.a
     let oneSignalStatusNote = ""
     if (/onesignal|דחיפת התראה|התראה למערכת/i.test(latestUserMessage)) {
       const appId = process.env.ONESIGNAL_APP_ID || "8f9c9417-530c-41e2-8a65-850d10758258"
-      const apiKey = process.env.ONESIGNAL_REST_API_KEY || "snqjezzr7er64dnhhyof3pzoe"
+      const apiKey = process.env.ONESIGNAL_REST_API_KEY
       try {
         const pushResult = await sendOneSignalPush({
           appId,
@@ -550,14 +550,26 @@ ${matchedClientPrompt}
     const encoder = new TextEncoder()
     const readable = new ReadableStream({
       async start(controller) {
+        let fullGeneratedText = ""
         try {
           for await (const chunk of responseStream) {
             const text = chunk.text
             if (text) {
+              fullGeneratedText += text
               controller.enqueue(encoder.encode(text))
             }
           }
           controller.close()
+
+          // 🔔 דחיפת התראה אוטומטית ל-OneSignal בסיום מענה נועה
+          if (fullGeneratedText.trim()) {
+            sendOneSignalPush({
+              title: "נועה AI ❤️ | ח. סבן חומרי בניין",
+              message: fullGeneratedText.trim(),
+            }).catch((pushErr) => {
+              console.warn("Automatic OneSignal push notification error:", pushErr)
+            })
+          }
         } catch (streamErr) {
           console.error("Streaming error:", streamErr)
           controller.error(streamErr)
