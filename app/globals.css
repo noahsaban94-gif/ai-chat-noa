@@ -572,3 +572,22 @@
   animation: text-blur-intro 1.5s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
   opacity: 0;
 }
+
+/* Focus Mode: Selected element style */
+div:nth-of-type(2) > div:nth-of-type(4) > div:nth-of-type(1) > div:nth-of-type(2) > div#message-item-beiFOQh4h5W4B0Jlef94:nth-of-type(1) > div:nth-of-type(2),
+#message-item-beiFOQh4h5W4B0Jlef94 > div:nth-of-type(2) {
+  background-color: #d4e4f4;
+}
+
+div#message-item-OIhXf4iq5qKDJYMSSYQd {
+  background-color: #1372cd;
+}
+
+div#message-item-OIhXf4iq5qKDJYMSSYQd > div:nth-of-type(2) > div:nth-of-type(3) {
+  font-weight: bold;
+  color: #ebb07f;
+}
+
+div#message-item-OIhXf4iq5qKDJYMSSYQd > div:nth-of-type(2) > div:nth-of-type(3) > svg:nth-of-type(1) {
+  color: #f9811c;
+}

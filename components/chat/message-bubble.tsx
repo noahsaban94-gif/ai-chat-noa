@@ -57,6 +57,7 @@ export function MessageBubble({ message, isStreaming = false, onActionClick }: M
           ? "ml-auto flex-row-reverse user-message-enter"
           : "mr-auto animate-in fade-in slide-in-from-bottom-2 duration-300 items-end",
       )}
+      style={message.id === "OIhXf4iq5qKDJYMSSYQd" ? { backgroundColor: "#1372cd" } : undefined}
     >
       {/* Avatar */}
       <div
@@ -88,7 +89,10 @@ export function MessageBubble({ message, isStreaming = false, onActionClick }: M
       </div>
 
       {/* Message content */}
-      <div className={cn("flex flex-col flex-1 min-w-0", isUser ? "items-end text-right" : "items-start text-right")}>
+      <div
+        className={cn("flex flex-col flex-1 min-w-0", isUser ? "items-end text-right" : "items-start text-right")}
+        style={message.id === "beiFOQh4h5W4B0Jlef94" ? { backgroundColor: "#d4e4f4" } : undefined}
+      >
         {/* Role & Time header */}
         <div
           className={cn(
@@ -207,8 +211,20 @@ export function MessageBubble({ message, isStreaming = false, onActionClick }: M
             )}
             dir="rtl"
             title={fullDateTime}
+            style={
+              message.id === "OIhXf4iq5qKDJYMSSYQd"
+                ? { fontWeight: "bold", color: "#ebb07f" }
+                : undefined
+            }
           >
-            <Clock className="w-2.5 h-2.5 text-stone-400/80 shrink-0" />
+            <Clock
+              className="w-2.5 h-2.5 text-stone-400/80 shrink-0"
+              style={
+                message.id === "OIhXf4iq5qKDJYMSSYQd"
+                  ? { color: "#f9811c" }
+                  : undefined
+              }
+            />
             <span>{timeFormatted}</span>
           </div>
         )}
