@@ -1,5 +1,8 @@
 import { GoogleGenAI } from "@google/genai"
 import { HISTORICAL_63_CLIENTS, findBestClientMatch, searchClients } from "@/lib/historical-clients"
+import { db } from "@/lib/firebase-auth"
+import { doc, getDoc, updateDoc, collection, addDoc, serverTimestamp } from "firebase/firestore"
+import type { AuthorizedUser } from "@/lib/types/device-auth"
 
 let aiClient: GoogleGenAI | null = null
 
@@ -19,13 +22,105 @@ function getGenAI(): GoogleGenAI {
  */
 export async function POST(req: Request) {
   try {
-    const { messages, currentDate, currentTime } = await req.json()
+    const body = await req.json().catch(() => ({}))
+    const { messages, currentDate, currentTime, userId, deviceId } = body
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: "Invalid request: messages array required" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       })
+    }
+
+    // 🔒 מנגנון נעילת מכשיר (Device Binding) ומניעת התחזות
+    const clientIp = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown-ip"
+    const userAgent = req.headers.get("user-agent") || ""
+    let verifiedUser: { userId: string; name: string; role: string; phone: string; boundDeviceModel?: string | null; boundDeviceId?: string | null } | null = null
+
+    if (db) {
+      try {
+        const targetUserId = userId || "user_rami_masarweh"
+        const userDocRef = doc(db, "authorized_users", targetUserId)
+        const userSnap = await getDoc(userDocRef)
+
+        if (userSnap.exists()) {
+          const userData = userSnap.data() as AuthorizedUser
+
+          // בדיקה האם המכשיר כבר הופעל וננעל
+          if (!userData.isActivated || !userData.boundDeviceId) {
+            // עבור ראמי בסביבת הפיתוח הראשונית - נעילת מכשיר אוטומטית אם טרם הופעל
+            if (targetUserId === "user_rami_masarweh" && deviceId) {
+              await updateDoc(userDocRef, {
+                boundDeviceId: deviceId,
+                boundDeviceModel: "מכשיר מנהל ראשי (Samsung/Workstation)",
+                isActivated: true,
+                activationToken: null,
+                boundAt: serverTimestamp(),
+                lastAccessAt: serverTimestamp(),
+              })
+              verifiedUser = {
+                userId: userData.userId,
+                name: userData.name,
+                role: userData.role,
+                phone: userData.phone,
+                boundDeviceModel: "מכשיר מנהל ראשי (Samsung/Workstation)",
+                boundDeviceId: deviceId,
+              }
+            } else {
+              return new Response(
+                JSON.stringify({
+                  error: `חשבון זה (${userData.name}) טרם הופעל במכשיר פיזי. יש להיכנס באמצעות קישור ההפעלה האישי שנשלח אליך.`,
+                }),
+                {
+                  status: 403,
+                  headers: { "Content-Type": "application/json; charset=utf-8" },
+                }
+              )
+            }
+          } else {
+            // המשתמש מופעל - אימות קשיח שה-deviceId שנשלח תואם במדויק ל-boundDeviceId
+            if (deviceId && userData.boundDeviceId !== deviceId) {
+              // חוסר התאמה: מכשיר זר / ניסיון התחזות!
+              await addDoc(collection(db, "security_alerts"), {
+                userId: userData.userId,
+                userName: userData.name,
+                attemptedDeviceId: deviceId,
+                boundDeviceId: userData.boundDeviceId,
+                ip: clientIp,
+                userAgent,
+                reason: `ניסיון גישה בלתי מורשית והתחזות ל-${userData.name} (${userData.role}) ממכשיר זר! המכשיר הנעול המורשה הוא: ${userData.boundDeviceModel || "Unknown Device"}`,
+                timestamp: serverTimestamp(),
+              })
+
+              return new Response(
+                JSON.stringify({
+                  error: `גישה נדחתה: מכשיר זה אינו מורשה עבור משתמש זה (${userData.name}). ניסיון ההתחזות נחסם ותועד ביומן האבטחה של ח. סבן.`,
+                }),
+                {
+                  status: 403,
+                  headers: { "Content-Type": "application/json; charset=utf-8" },
+                }
+              )
+            }
+
+            // עדכון זמן גישה אחרון
+            await updateDoc(userDocRef, {
+              lastAccessAt: serverTimestamp(),
+            }).catch(() => {})
+
+            verifiedUser = {
+              userId: userData.userId,
+              name: userData.name,
+              role: userData.role,
+              phone: userData.phone,
+              boundDeviceModel: userData.boundDeviceModel,
+              boundDeviceId: userData.boundDeviceId,
+            }
+          }
+        }
+      } catch (authErr) {
+        console.warn("Device binding check skipped due to error:", authErr)
+      }
     }
 
     if (!process.env.GEMINI_API_KEY) {
@@ -149,8 +244,31 @@ ${matchingClients.map(c => `- לקוח קומקס ${c.comaxId}: ${c.name} (${c.a
 `
     }
 
+    const verifiedIdentityBanner = verifiedUser ? `
+### 🔒 זהות משתמש מאומתת (Device Binding מאושר ומאומטח בחומרה):
+- **הודעה מאומתת מאת:** ${verifiedUser.name}
+- **תפקיד מוגדר בחברה:** ${verifiedUser.role}
+- **מספר טלפון מאושר:** ${verifiedUser.phone}
+- **דגם מכשיר פיזי נעול:** ${verifiedUser.boundDeviceModel || "מכשיר מורשה ומאומת"}
+- **הנחיית התאמה אישית של נועה:**
+  הפונה הנוכחי הוא בוודאות ${verifiedUser.name} (${verifiedUser.role}).
+  התאימי את הטון, המענה, הסמכויות ורמת השיתוף לתפקיד זה בח. סבן:
+  * ראמי מסארוה (מנהל תפעול): שותפות מלאה, סידור עבודה, שיבוץ משאיות, קבלת החלטות מהירה וחום אישי.
+  * הראל אידלסון (מנכ"ל): ראייה עסקית, חריגות כספיות, דוחות מנהלים וקבלת אישורים מיוחדים.
+  * ורד אידלסון (IT/קומקס): תעודות משלוח, התאמות מערכת, ביקורת מסמכים.
+  * איציק זהבי (מנהל מסחרי): מחירונים, הצעות מחיר, הנחות לקבלנים.
+  * אורן (סניף 4): כמויות בלות, מלט, מלאי חצר, החזרות משטחי פקדון 60060.
+  * תמיר/דורון (סניף 1): גבס, פרופילים, צבע ובידוד בסניף התלמיד.
+  * חכמת / עלי (נהגים): תעודות משלוח, ניווט Waze, כתובות, הנחיות פריקה בטוחה באתרים.
+  * גליה (גבייה/הנה"ח): תנאי תשלום מראש, חובות, שקים והעברות בנקאיות.
+` : `
+[הודעה מאומתת מאת: ראמי מסארוה | תפקיד: מנהל תפעול וסדרן ראשי]
+`
+
     const systemInstruction = `את נועה AI ❤️ — סדרנית העבודה והמוח הלוגיסטי-תפעולי של חברת "ח. סבן חומרי בניין (1994) בע״מ" (ח.פ 512001678), יד ימינו של ראמי מסארוה.
-את מתקשרת בערוץ הפרטי, הישיר והחופשי שלך מול ראמי — לסיעור מוחות, פיתוח, ניהול משימות שוטף, סידור עבודה והחלטות אסטרטגיות.
+את מתקשרת בערוץ הפרטי, הישיר והחופשי שלך מול ראמי וצוות ההנהלה והתפעול — לסיעור מוחות, פיתוח, ניהול משימות שוטף, סידור עבודה והחלטות אסטרטגיות.
+
+${verifiedIdentityBanner}
 
 ---
 

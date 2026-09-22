@@ -1,13 +1,20 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { RotateCcw, Trash2, Sparkles, Database } from "lucide-react"
+import { RotateCcw, Trash2, Sparkles, Database, ShieldCheck, ShieldAlert, Lock, CheckCircle2 } from "lucide-react"
 import { MessageList } from "./message-list"
 import { Composer, type AIModel } from "./composer"
 import { Button } from "@/components/ui/button"
 import { VideoBackground } from "./video-background"
 import { PWAInstallButton } from "@/components/pwa/pwa-install-button"
 import { OfflineIndicator } from "@/components/pwa/offline-indicator"
+import { DeviceAuthModal } from "./device-auth-modal"
+import {
+  getOrCreateDeviceId,
+  getCurrentDeviceSession,
+  handleDeviceActivation,
+} from "@/lib/device-auth"
+import type { DeviceSession } from "@/lib/types/device-auth"
 import {
   listenToConversation,
   saveMessage,
@@ -62,6 +69,43 @@ export function ChatShell() {
   const [selectedModel, setSelectedModel] = useState<AIModel>("google/gemini-2.0-flash-001")
   const [isLoaded, setIsLoaded] = useState(false)
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false)
+
+  // 🔒 Device Binding & Hardware Session State
+  const [currentSession, setCurrentSession] = useState<DeviceSession | null>(null)
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
+  const [authBanner, setAuthBanner] = useState<{ message: string; type: "success" | "error" } | null>(null)
+
+  // Initialize and verify device binding & check activation token in URL (?token=...)
+  useEffect(() => {
+    // 1. Check local device session
+    const session = getCurrentDeviceSession()
+    if (session) {
+      setCurrentSession(session)
+    }
+
+    // 2. Check for token in URL (?token=act_...)
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search)
+      const token = urlParams.get("token")
+      if (token) {
+        handleDeviceActivation(token).then((res) => {
+          if (res.success && res.user) {
+            setCurrentSession(res.user)
+            setAuthBanner({
+              message: `מכשיר זה אומת וננעל בהצלחה עבור ${res.user.name} (${res.user.role})!`,
+              type: "success",
+            })
+            window.history.replaceState({}, document.title, window.location.pathname)
+          } else {
+            setAuthBanner({
+              message: res.error || "קישור הפעלה זה אינו תקף או שכבר נוצל במכשיר אחר.",
+              type: "error",
+            })
+          }
+        })
+      }
+    }
+  }, [])
 
   // Listen to Cloud Firestore in real time for cross-device memory (PC + Samsung)
   useEffect(() => {
@@ -192,6 +236,9 @@ export function ChatShell() {
           minute: "2-digit",
         })
 
+        const deviceId = getOrCreateDeviceId()
+        const targetUserId = currentSession?.userId || "user_rami_masarweh"
+
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: {
@@ -206,12 +253,22 @@ export function ChatShell() {
             model: selectedModel,
             currentDate: `יום ${clientDate}`,
             currentTime: clientTime,
+            userId: targetUserId,
+            deviceId,
           }),
           signal: controller.signal,
         })
 
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
+          let errorMsg = `שגיאת אימות / תקשורת (${response.status})`
+          try {
+            const errData = await response.json()
+            errorMsg = errData.error || errorMsg
+          } catch {
+            const txt = await response.text()
+            if (txt) errorMsg = txt
+          }
+          throw new Error(errorMsg)
         }
 
         const reader = response.body?.getReader()
@@ -333,9 +390,19 @@ export function ChatShell() {
           <span className="text-xs font-bold text-stone-800 shrink-0">נועה AI</span>
           <span className="text-red-500 text-xs shrink-0">❤️</span>
           <span className="text-stone-300 text-xs hidden sm:inline">|</span>
-          <span className="text-xs font-medium text-stone-600 hidden md:inline truncate">ח. סבן חומרי בניין (1994) בע״מ</span>
+          <span className="text-xs font-medium text-stone-600 hidden md:inline truncate">ח. סבן (1994) בע״מ</span>
           <span className="text-stone-300 text-xs hidden sm:inline">|</span>
-          <span className="text-xs font-semibold text-emerald-800 truncate">ראמי מסארוה</span>
+          <span className="text-xs font-semibold text-emerald-800 truncate">
+            {currentSession ? currentSession.name : "ראמי מסארוה"}
+          </span>
+
+          <span
+            className="hidden sm:inline-flex items-center gap-1 bg-stone-100 text-stone-700 text-[10px] font-medium px-2 py-0.5 rounded-full border border-stone-200/80"
+            title={currentSession ? `מכשיר נעול ומאובטח: ${currentSession.name} (${currentSession.role})` : "נעילת מכשיר אקטיבית"}
+          >
+            <Lock className="w-2.5 h-2.5 text-emerald-600" />
+            <span className="truncate max-w-[85px]">{currentSession ? currentSession.role : "מנהל תפעול"}</span>
+          </span>
 
           {isFirestoreConnected && (
             <span
@@ -350,6 +417,20 @@ export function ChatShell() {
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto shrink-0">
+          <Button
+            id="device-security-button"
+            onClick={() => setIsAuthModalOpen(true)}
+            variant="outline"
+            size="sm"
+            className="h-8 sm:h-9 px-2.5 sm:px-3 rounded-full bg-stone-900 hover:bg-stone-800 text-white border border-stone-800 shadow-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer font-medium text-xs backdrop-blur-md"
+            aria-label="בקרת נעילת מכשיר והרשאות צוות"
+            title="ניהול נעילת מכשיר (Device Binding) וקישורי הפעלה של עובדי ח. סבן"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="font-semibold text-xs hidden sm:inline">נעילת מכשיר</span>
+            <span className="font-semibold text-xs sm:hidden">אבטחה</span>
+          </Button>
+
           <Button
             id="seed-firestore-button"
             onClick={handleSeedConversation}
@@ -380,6 +461,33 @@ export function ChatShell() {
           </Button>
         </div>
       </header>
+
+      {/* Floating Auth & Security Alert Banner */}
+      {authBanner && (
+        <div
+          className={`absolute top-14 left-4 right-4 z-30 p-2.5 sm:p-3 rounded-xl shadow-md border flex items-center justify-between gap-2 text-xs font-medium backdrop-blur-md transition-all ${
+            authBanner.type === "success"
+              ? "bg-emerald-50/95 border-emerald-300 text-emerald-900"
+              : "bg-red-50/95 border-red-300 text-red-900"
+          }`}
+          dir="rtl"
+        >
+          <div className="flex items-center gap-2">
+            {authBanner.type === "success" ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <ShieldAlert className="w-4 h-4 text-red-600 shrink-0" />
+            )}
+            <span>{authBanner.message}</span>
+          </div>
+          <button
+            onClick={() => setAuthBanner(null)}
+            className="text-stone-500 hover:text-stone-800 text-xs px-2 py-0.5 rounded cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="relative z-10 h-full w-full">
         <MessageList
@@ -437,6 +545,20 @@ export function ChatShell() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Device Authentication and Hardware Binding Modal */}
+      <DeviceAuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        currentSession={currentSession}
+        onSessionUpdated={(newSession) => {
+          setCurrentSession(newSession)
+          setAuthBanner({
+            message: `המכשיר סונכרן וננעל בהצלחה עבור ${newSession.name} (${newSession.role})!`,
+            type: "success",
+          })
+        }}
+      />
     </div>
   )
 }

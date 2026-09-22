@@ -7,6 +7,18 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // קולקציית משתמשים מורשים ונעילת מכשיר (Hardware / Device Binding)
+    // חסומה לחלוטין לקריאה וכתיבה מהלקוח - מנוהלת אך ורק דרך ה-Backend API
+    match /authorized_users/{userId} {
+      allow read, write: if false;
+    }
+
+    // קולקציית התראות אבטחה וניסיונות חדירה
+    // חסומה לחלוטין לקריאה וכתיבה מהלקוח - רישום אך ורק ע"י השרת המאומת
+    match /security_alerts/{alertId} {
+      allow read, write: if false;
+    }
+
     // קולקציית שיחות ראשית (conversations)
     match /conversations/{sessionId} {
       // קריאה מותרת לסנכרון רב-מכשירי (PC + Samsung Mobile)
