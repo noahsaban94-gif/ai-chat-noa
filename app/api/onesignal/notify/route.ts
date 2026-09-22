@@ -12,7 +12,7 @@ interface NotificationPayload {
 
 export async function GET() {
   const appId = process.env.ONESIGNAL_APP_ID || "8f9c9417-530c-41e2-8a65-850d10758258"
-  const apiKey = process.env.ONESIGNAL_REST_API_KEY || "snqjezzr7er64dnhhyof3pzoe"
+  const apiKey = process.env.ONESIGNAL_REST_API_KEY || "os_v2_app_r6ojif2tbra6fctfqugra5mcld3qwaxp2lgevdvazqtnecdbnlkd5ooualhui4dlke7nv6lvug4qhquicjd2e3jmkkpsk72lv3wz5cy"
 
   const isConfigured = Boolean(apiKey)
 
@@ -23,7 +23,7 @@ export async function GET() {
     appIdConfigured: true,
     apiKeyConfigured: Boolean(apiKey),
     hint: isConfigured
-      ? "מערכת OneSignal מוגדרת עם הרשאת Authorization תקינה."
+      ? "מערכת OneSignal מוגדרת ומוכנה לדחיפת התראות אוטומטית."
       : "יש להגדיר ONESIGNAL_REST_API_KEY בהגדרות המערכת (Settings).",
   })
 }
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     }
 
     const appId = process.env.ONESIGNAL_APP_ID || "8f9c9417-530c-41e2-8a65-850d10758258"
-    const apiKey = body.apiKey || process.env.ONESIGNAL_REST_API_KEY || "snqjezzr7er64dnhhyof3pzoe"
+    const apiKey = body.apiKey || process.env.ONESIGNAL_REST_API_KEY
 
     const result = await sendOneSignalPush({
       appId,
