@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { RotateCcw, Trash2, Sparkles, Database, ShieldCheck, ShieldAlert, Lock, CheckCircle2 } from "lucide-react"
+import { RotateCcw, Trash2, Sparkles, Database, ShieldCheck, ShieldAlert, Lock, CheckCircle2, Volume2, VolumeX } from "lucide-react"
 import { MessageList } from "./message-list"
 import { Composer, type AIModel } from "./composer"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,8 @@ import { PWAInstallButton } from "@/components/pwa/pwa-install-button"
 import { OfflineIndicator } from "@/components/pwa/offline-indicator"
 import { DeviceAuthModal } from "./device-auth-modal"
 import { DevicePairingModal } from "./device-pairing-modal"
+import { useSpeech } from "@/hooks/use-speech"
+import { cn } from "@/lib/utils"
 import {
   getOrCreateDeviceId,
   getCurrentDeviceSession,
@@ -82,6 +84,28 @@ export function ChatShell() {
     phone: string
     pendingMessage?: { content: string; imageData?: string }
   } | null>(null)
+
+  // Speech engine for Noa (Hebrew female voice)
+  const {
+    speakingMessageId,
+    isLoading: isLoadingSpeech,
+    autoSpeakEnabled,
+    speak,
+    stop: stopSpeech,
+    toggleAutoSpeak,
+  } = useSpeech()
+
+  // Track streaming finish to trigger auto-speak if enabled
+  const wasStreamingRef = useRef(false)
+  useEffect(() => {
+    if (wasStreamingRef.current && !isStreaming && autoSpeakEnabled) {
+      const lastMessage = messages[messages.length - 1]
+      if (lastMessage && lastMessage.role === "assistant" && lastMessage.content) {
+        speak(lastMessage.id, lastMessage.content)
+      }
+    }
+    wasStreamingRef.current = isStreaming
+  }, [isStreaming, autoSpeakEnabled, messages, speak])
 
   // Initialize and verify device binding & check activation token in URL (?token=...)
   useEffect(() => {
@@ -202,6 +226,7 @@ export function ChatShell() {
     async (content: string, imageData?: string) => {
       if ((!content.trim() && !imageData) || isStreaming) return
 
+      stopSpeech()
       setError(null)
 
       const userMessage: Message = {
@@ -482,6 +507,40 @@ export function ChatShell() {
 
           <PWAInstallButton />
 
+          {/* Voice Auto-Speak Toggle Button */}
+          <Button
+            id="voice-auto-speak-toggle"
+            onClick={toggleAutoSpeak}
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "h-8 px-2.5 sm:px-3 rounded-full font-semibold text-xs flex items-center gap-1.5 transition-all duration-200 active:scale-95 cursor-pointer shadow-2xs border",
+              autoSpeakEnabled
+                ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300/80"
+                : "bg-stone-100/90 hover:bg-stone-200/80 text-stone-600 hover:text-stone-900 border-stone-200/60",
+            )}
+            title={
+              autoSpeakEnabled
+                ? "קול של נועה מופעל (נועה מדברת אוטומטית בעברית נשית בכל תשובה) - לחץ להשתקה"
+                : "קול של נועה מושתק (השמעה ידנית בלבד לפי דרישה) - לחץ להפעלה אוטומטית"
+            }
+            aria-label={autoSpeakEnabled ? "השתקת קול נועה" : "הפעלת קול נועה"}
+          >
+            {autoSpeakEnabled ? (
+              <>
+                <Volume2 className="w-3.5 h-3.5 text-emerald-600 animate-pulse shrink-0" />
+                <span className="hidden sm:inline">קול פעיל</span>
+                <span className="sm:hidden">קול</span>
+              </>
+            ) : (
+              <>
+                <VolumeX className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                <span className="hidden sm:inline">קול כבוי</span>
+                <span className="sm:hidden">קול</span>
+              </>
+            )}
+          </Button>
+
           <Button
             id="clear-history-button"
             onClick={handleStartNewSession}
@@ -532,12 +591,18 @@ export function ChatShell() {
           onRetry={retry}
           isLoaded={isLoaded}
           onSendMessage={sendMessage}
+          speakingMessageId={speakingMessageId}
+          isLoadingSpeech={isLoadingSpeech}
+          onToggleSpeech={speak}
         />
       </div>
 
       <Composer
         onSend={sendMessage}
-        onStop={stopStreaming}
+        onStop={() => {
+          stopSpeech()
+          stopStreaming()
+        }}
         isStreaming={isStreaming}
         disabled={!!error}
         selectedModel={selectedModel}

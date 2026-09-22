@@ -15,6 +15,9 @@ interface MessageListProps {
   onRetry: () => void
   isLoaded: boolean // Added isLoaded prop to know when localStorage is loaded
   onSendMessage?: (text: string) => void
+  speakingMessageId?: string | null
+  isLoadingSpeech?: boolean
+  onToggleSpeech?: (messageId: string, text: string) => void
 }
 
 function getDayKey(date: Date | string | number | undefined): string {
@@ -55,7 +58,17 @@ function getDayLabel(date: Date | string | number | undefined): string {
 
 const LAUNCH_SOUND_URL = "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/launch-SUi0itAGHr1wtvdDYYG5bzFLsIYHtP.mp3"
 
-export function MessageList({ messages, isStreaming, error, onRetry, isLoaded, onSendMessage }: MessageListProps) {
+export function MessageList({
+  messages,
+  isStreaming,
+  error,
+  onRetry,
+  isLoaded,
+  onSendMessage,
+  speakingMessageId,
+  isLoadingSpeech,
+  onToggleSpeech,
+}: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
@@ -244,6 +257,9 @@ export function MessageList({ messages, isStreaming, error, onRetry, isLoaded, o
                 message={message}
                 isStreaming={isStreaming && message.role === "assistant" && message === lastMessage}
                 onActionClick={onSendMessage}
+                isSpeaking={speakingMessageId === message.id}
+                isLoadingSpeech={isLoadingSpeech && speakingMessageId === message.id}
+                onToggleSpeech={onToggleSpeech}
               />
             </div>
           )

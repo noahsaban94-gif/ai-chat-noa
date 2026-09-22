@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils"
 import type { Message } from "./chat-shell"
-import { Clock } from "lucide-react"
+import { Clock, Volume2, VolumeX, Loader2 } from "lucide-react"
 import { MarkdownRenderer } from "./markdown-renderer"
 import Image from "next/image"
 
@@ -10,6 +10,9 @@ interface MessageBubbleProps {
   message: Message
   isStreaming?: boolean
   onActionClick?: (action: string) => void
+  isSpeaking?: boolean
+  isLoadingSpeech?: boolean
+  onToggleSpeech?: (messageId: string, text: string) => void
 }
 
 // Format time for display (e.g. 10:24)
@@ -43,7 +46,14 @@ export function formatFullDateTime(date: Date | string | number | undefined): st
   }
 }
 
-export function MessageBubble({ message, isStreaming = false, onActionClick }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  isStreaming = false,
+  onActionClick,
+  isSpeaking = false,
+  isLoadingSpeech = false,
+  onToggleSpeech,
+}: MessageBubbleProps) {
   const isUser = message.role === "user"
   const timeFormatted = formatTime(message.createdAt)
   const fullDateTime = formatFullDateTime(message.createdAt)
@@ -247,32 +257,70 @@ export function MessageBubble({ message, isStreaming = false, onActionClick }: M
           </div>
         </div>
 
-        {/* Timestamp next to bubble footer */}
-        {timeFormatted && (
-          <div
-            className={cn(
-              "flex items-center gap-1 text-[11px] text-stone-400 mt-1 px-1.5 select-none",
-              isUser ? "justify-end" : "justify-start",
-            )}
-            dir="rtl"
-            title={fullDateTime}
-            style={
-              message.id === "OIhXf4iq5qKDJYMSSYQd"
-                ? { fontWeight: "bold", color: "#ebb07f" }
-                : undefined
-            }
-          >
-            <Clock
-              className="w-2.5 h-2.5 text-stone-400/80 shrink-0"
+        {/* Timestamp & Speech controls next to bubble footer */}
+        <div
+          className={cn(
+            "flex items-center gap-2 text-[11px] text-stone-400 mt-1 px-1.5 select-none",
+            isUser ? "justify-end" : "justify-start",
+          )}
+          dir="rtl"
+        >
+          {timeFormatted && (
+            <div
+              className="flex items-center gap-1"
+              title={fullDateTime}
               style={
                 message.id === "OIhXf4iq5qKDJYMSSYQd"
-                  ? { color: "#f9811c" }
+                  ? { fontWeight: "bold", color: "#ebb07f" }
                   : undefined
               }
-            />
-            <span>{timeFormatted}</span>
-          </div>
-        )}
+            >
+              <Clock
+                className="w-2.5 h-2.5 text-stone-400/80 shrink-0"
+                style={
+                  message.id === "OIhXf4iq5qKDJYMSSYQd"
+                    ? { color: "#f9811c" }
+                    : undefined
+                }
+              />
+              <span>{timeFormatted}</span>
+            </div>
+          )}
+
+          {/* Voice Speak Button for Noa's messages */}
+          {!isUser && !isStreaming && onToggleSpeech && message.content && (
+            <button
+              type="button"
+              id={`speak-btn-${message.id}`}
+              onClick={() => onToggleSpeech(message.id, message.content)}
+              className={cn(
+                "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-all cursor-pointer active:scale-95",
+                isSpeaking
+                  ? "bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 shadow-2xs animate-pulse"
+                  : "bg-stone-100 hover:bg-stone-200/80 text-stone-600 hover:text-stone-900 border border-stone-200/60 shadow-2xs",
+              )}
+              title={isSpeaking ? "עצור הקראה של נועה" : "השמעת הודעה בקול נשי של נועה (עברית מלאה)"}
+              aria-label={isSpeaking ? "עצור הקראה" : "השמעת הודעה בקול"}
+            >
+              {isLoadingSpeech ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin text-stone-500" />
+                  <span>מכין קול...</span>
+                </>
+              ) : isSpeaking ? (
+                <>
+                  <VolumeX className="w-3 h-3 text-rose-600" />
+                  <span className="font-semibold text-rose-700">עצור</span>
+                </>
+              ) : (
+                <>
+                  <Volume2 className="w-3 h-3 text-stone-500 hover:text-stone-800" />
+                  <span>השמעה</span>
+                </>
+              )}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
