@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai"
 import { HISTORICAL_63_CLIENTS, findBestClientMatch, searchClients } from "@/lib/historical-clients"
 import { TRAINING_PRODUCTS, findTrainingVideos } from "@/lib/training-videos"
+import { sendOneSignalPush } from "@/lib/onesignal"
 import { db } from "@/lib/firebase-auth"
 import { doc, getDoc, updateDoc, collection, addDoc, serverTimestamp, arrayUnion } from "firebase/firestore"
 import type { AuthorizedUser } from "@/lib/types/device-auth"
@@ -294,49 +295,30 @@ ${matchingClients.map(c => `- לקוח קומקס ${c.comaxId}: ${c.name} (${c.a
     let oneSignalStatusNote = ""
     if (/onesignal|דחיפת התראה|התראה למערכת/i.test(latestUserMessage)) {
       const appId = process.env.ONESIGNAL_APP_ID || "8f9c9417-530c-41e2-8a65-850d10758258"
-      const apiKey = process.env.ONESIGNAL_REST_API_KEY
-      if (apiKey) {
-        try {
-          const pushRes = await fetch("https://onesignal.com/api/v1/notifications", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json; charset=utf-8",
-              Authorization: `Basic ${apiKey}`,
-            },
-            body: JSON.stringify({
-              app_id: appId,
-              included_segments: ["Subscribed Users", "Total Subscriptions"],
-              headings: { he: "נועה AI ❤️ | ח. סבן חומרי בניין", en: "Noa AI | H. Saban" },
-              contents: {
-                he: `הודעה מבצעית מנועה AI:\n${latestUserMessage}\n\n🏷️ חותמת מענה רשמית: נועה AI ❤️ (ח. סבן) | ${effectiveTime} (${effectiveDate})`,
-                en: `Operational alert from Noa AI.\n\n🏷️ Official Stamp: Noa AI (H. Saban) | ${effectiveTime} (${effectiveDate})`,
-              },
-              data: { sender: "noa_ai", stamp: true, israelTime: effectiveTime },
-            }),
-          })
-          const pushData = await pushRes.json().catch(() => null)
-          if (pushRes.ok) {
-            oneSignalStatusNote = `\n\n### 🔔 סטטוס דחיפת התראה ל-OneSignal:
-- ההתראה נדחפה בהצלחה למערכת OneSignal עם חותמת מענה רשמית מנועה!
-- מזהה התראה (Notification ID): ${pushData?.id || "מאושר"}
-- נמענים רשומים: ${pushData?.recipients || 0}
-- צייני לראמי בביטחון ובחום שההתראה נדחפה בהצלחה למערכת עם חותמת רשמית וזמן מדויק.`
-          } else {
-            oneSignalStatusNote = `\n\n### 🔔 סטטוס דחיפת התראה ל-OneSignal:
-- שגיאה מול שרתי OneSignal: ${JSON.stringify(pushData?.errors || pushData)}
-- צייני לראמי את הפרטים.`
-          }
-        } catch (e: unknown) {
-          const errMsg = e instanceof Error ? e.message : String(e)
+      const apiKey = process.env.ONESIGNAL_REST_API_KEY || "snqjezzr7er64dnhhyof3pzoe"
+      try {
+        const pushResult = await sendOneSignalPush({
+          appId,
+          apiKey,
+          message: latestUserMessage,
+          title: "נועה AI ❤️ | ח. סבן חומרי בניין",
+        })
+        if (pushResult.success) {
           oneSignalStatusNote = `\n\n### 🔔 סטטוס דחיפת התראה ל-OneSignal:
-- כשל תקשורת מול OneSignal: ${errMsg}`
+- ההתראה נדחפה בהצלחה למערכת OneSignal עם חותמת מענה רשמית מנועה!
+- מזהה התראה (Notification ID): ${pushResult.id || "מאושר"}
+- נמענים רשומים: ${pushResult.recipients || 0}
+- שיטת אימות שנבחרה: ${pushResult.authUsed || "Key"}
+- צייני לראמי בביטחון ובחום שההתראה נדחפה בהצלחה למערכת עם חותמת רשמית וזמן מדויק.`
+        } else {
+          oneSignalStatusNote = `\n\n### 🔔 סטטוס דחיפת התראה ל-OneSignal:
+- סטטוס תגובה משרתי OneSignal: ${JSON.stringify(pushResult.error)}
+- צייני לראמי את הפרטים.`
         }
-      } else {
-        oneSignalStatusNote = `\n\n### 🔔 סטטוס מערכת OneSignal:
-- מזהה האפליקציה ב-OneSignal מקושר: 8f9c9417-530c-41e2-8a65-850d10758258.
-- ערוץ הדחיפה של נועה (/api/onesignal/notify) פעיל וכפתור "התראת OneSignal" נוסף בכל הודעה של נועה.
-- נדרש רק להגדיר את מפתח ה-API הסודי ONESIGNAL_REST_API_KEY בהגדרות (Settings) של האפליקציה לצורך שליחה ישירה לכל המכשירים הרשומים.
-- הסבירי לראמי שהתשתית מוכנה לחלוטין וניתן לדחוף כל מענה בלחיצה אחת על כפתור "התראת OneSignal".`
+      } catch (e: unknown) {
+        const errMsg = e instanceof Error ? e.message : String(e)
+        oneSignalStatusNote = `\n\n### 🔔 סטטוס דחיפת התראה ל-OneSignal:
+- כשל תקשורת מול OneSignal: ${errMsg}`
       }
     }
 
