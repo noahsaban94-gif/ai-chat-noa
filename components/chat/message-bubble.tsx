@@ -2,10 +2,9 @@
 
 import { cn } from "@/lib/utils"
 import type { Message } from "./chat-shell"
-import { User } from "lucide-react"
+import { Clock } from "lucide-react"
 import { MarkdownRenderer } from "./markdown-renderer"
 import Image from "next/image"
-import { AnimatedOrb } from "./animated-orb"
 
 interface MessageBubbleProps {
   message: Message
@@ -13,16 +12,45 @@ interface MessageBubbleProps {
   onActionClick?: (action: string) => void
 }
 
-// Format time for display
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+// Format time for display (e.g. 10:24)
+export function formatTime(date: Date | string | number | undefined): string {
+  if (!date) return ""
+  try {
+    const d = date instanceof Date ? date : new Date(date)
+    if (isNaN(d.getTime())) return ""
+    return d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })
+  } catch {
+    return ""
+  }
+}
+
+// Format full date and time for tooltip and accessibility
+export function formatFullDateTime(date: Date | string | number | undefined): string {
+  if (!date) return ""
+  try {
+    const d = date instanceof Date ? date : new Date(date)
+    if (isNaN(d.getTime())) return ""
+    return d.toLocaleString("he-IL", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  } catch {
+    return ""
+  }
 }
 
 export function MessageBubble({ message, isStreaming = false, onActionClick }: MessageBubbleProps) {
   const isUser = message.role === "user"
+  const timeFormatted = formatTime(message.createdAt)
+  const fullDateTime = formatFullDateTime(message.createdAt)
 
   return (
     <div
+      id={`message-item-${message.id}`}
       className={cn(
         "flex max-w-[95%] md:max-w-[85%] gap-2.5",
         isUser
@@ -60,22 +88,40 @@ export function MessageBubble({ message, isStreaming = false, onActionClick }: M
       </div>
 
       {/* Message content */}
-      <div className={cn("flex flex-col", isUser ? "items-end text-right" : "items-start text-right")}>
-        {/* Role label */}
-        <span className="text-xs text-stone-400 mb-1 hidden sm:flex items-center gap-1.5 mt-2" dir="rtl">
+      <div className={cn("flex flex-col flex-1 min-w-0", isUser ? "items-end text-right" : "items-start text-right")}>
+        {/* Role & Time header */}
+        <div
+          className={cn(
+            "flex items-center gap-1.5 mb-1 px-1 text-xs select-none",
+            isUser ? "flex-row-reverse" : "flex-row",
+          )}
+          dir="rtl"
+        >
           {isUser ? (
             <span className="font-semibold text-emerald-800">ראמי מסארוה</span>
           ) : (
-            <span className="font-semibold text-stone-600 flex items-center gap-1">
+            <span className="font-semibold text-stone-700 flex items-center gap-1">
               <span>נועה AI</span>
               <span className="text-red-500 text-[11px]">❤️</span>
-              <span className="text-[10px] text-stone-400 font-normal">| ח. סבן חומרי בניין</span>
+              <span className="text-[10px] text-stone-400 font-normal hidden sm:inline">| ח. סבן</span>
             </span>
           )}
-        </span>
+          <span className="text-stone-300 text-[10px]">•</span>
+          {timeFormatted && (
+            <time
+              dateTime={message.createdAt ? new Date(message.createdAt).toISOString() : undefined}
+              className="text-[11px] font-medium text-stone-500 flex items-center gap-1 tracking-tight"
+              title={fullDateTime}
+            >
+              <Clock className="w-3 h-3 text-stone-400 inline shrink-0" />
+              <span>{timeFormatted}</span>
+            </time>
+          )}
+        </div>
 
         {/* Bubble */}
         <div
+          id={`message-bubble-${message.id}`}
           className={cn(
             "rounded-2xl border-none overflow-hidden",
             isUser
@@ -140,8 +186,20 @@ export function MessageBubble({ message, isStreaming = false, onActionClick }: M
           </div>
         </div>
 
-        {/* Timestamp */}
-        <span className="text-xs text-stone-400 mt-1">{formatTime(message.createdAt)}</span>
+        {/* Timestamp next to bubble footer */}
+        {timeFormatted && (
+          <div
+            className={cn(
+              "flex items-center gap-1 text-[11px] text-stone-400 mt-1 px-1.5 select-none",
+              isUser ? "justify-end" : "justify-start",
+            )}
+            dir="rtl"
+            title={fullDateTime}
+          >
+            <Clock className="w-2.5 h-2.5 text-stone-400/80 shrink-0" />
+            <span>{timeFormatted}</span>
+          </div>
+        )}
       </div>
     </div>
   )

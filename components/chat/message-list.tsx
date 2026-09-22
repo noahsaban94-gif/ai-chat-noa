@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { MessageBubble } from "./message-bubble"
 import type { Message } from "./chat-shell"
 import { TypingIndicator } from "./typing-indicator"
-import { AlertCircle, RefreshCw } from "lucide-react"
+import { AlertCircle, RefreshCw, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AnimatedOrb } from "./animated-orb"
 
@@ -15,6 +15,42 @@ interface MessageListProps {
   onRetry: () => void
   isLoaded: boolean // Added isLoaded prop to know when localStorage is loaded
   onSendMessage?: (text: string) => void
+}
+
+function getDayKey(date: Date | string | number | undefined): string {
+  if (!date) return ""
+  try {
+    const d = date instanceof Date ? date : new Date(date)
+    if (isNaN(d.getTime())) return ""
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+  } catch {
+    return ""
+  }
+}
+
+function getDayLabel(date: Date | string | number | undefined): string {
+  if (!date) return ""
+  try {
+    const d = date instanceof Date ? date : new Date(date)
+    if (isNaN(d.getTime())) return ""
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+    const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+    const diffDays = Math.round((today - msgDay) / (1000 * 60 * 60 * 24))
+
+    if (diffDays === 0) return "היום"
+    if (diffDays === 1) return "אתמול"
+    if (diffDays < 7 && diffDays > 0) {
+      return d.toLocaleDateString("he-IL", { weekday: "long" })
+    }
+    return d.toLocaleDateString("he-IL", {
+      day: "numeric",
+      month: "long",
+      year: d.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+    })
+  } catch {
+    return ""
+  }
 }
 
 const LAUNCH_SOUND_URL = "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/launch-SUi0itAGHr1wtvdDYYG5bzFLsIYHtP.mp3"
@@ -182,22 +218,39 @@ export function MessageList({ messages, isStreaming, error, onRetry, isLoaded, o
       )}
 
       {/* Messages */}
-      {messages
-        .filter((message) => {
+      {(() => {
+        const visibleMessages = messages.filter((message) => {
           // Hide empty assistant messages during streaming - they'll be shown as typing indicator instead
           if (isStreaming && message.role === "assistant" && message === lastMessage && message.content === "") {
             return false
           }
           return true
         })
-        .map((message) => (
-          <MessageBubble
-            key={message.id}
-            message={message}
-            isStreaming={isStreaming && message.role === "assistant" && message === lastMessage}
-            onActionClick={onSendMessage}
-          />
-        ))}
+
+        return visibleMessages.map((message, index) => {
+          const prevMessage = index > 0 ? visibleMessages[index - 1] : null
+          const showDateDivider = !prevMessage || getDayKey(message.createdAt) !== getDayKey(prevMessage.createdAt)
+          const dayLabel = getDayLabel(message.createdAt)
+
+          return (
+            <div key={message.id} className="space-y-4">
+              {showDateDivider && dayLabel && (
+                <div className="flex items-center justify-center my-3 select-none" dir="rtl">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-stone-200/70 backdrop-blur-xs text-stone-600 text-[11px] font-semibold border border-stone-300/60 shadow-2xs">
+                    <Calendar className="w-3 h-3 text-stone-500" />
+                    <span>{dayLabel}</span>
+                  </div>
+                </div>
+              )}
+              <MessageBubble
+                message={message}
+                isStreaming={isStreaming && message.role === "assistant" && message === lastMessage}
+                onActionClick={onSendMessage}
+              />
+            </div>
+          )
+        })
+      })()}
 
       {showTypingIndicator && <TypingIndicator />}
 

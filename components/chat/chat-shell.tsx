@@ -1,13 +1,23 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { MessageSquareDashed } from "lucide-react"
+import { RotateCcw, Trash2 } from "lucide-react"
 import { MessageList } from "./message-list"
 import { Composer, type AIModel } from "./composer"
 import { Button } from "@/components/ui/button"
 import { VideoBackground } from "./video-background"
 import { PWAInstallButton } from "@/components/pwa/pwa-install-button"
 import { OfflineIndicator } from "@/components/pwa/offline-indicator"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 // Data model for messages
 export interface Message {
@@ -34,6 +44,7 @@ export function ChatShell() {
   const [abortController, setAbortController] = useState<AbortController | null>(null)
   const [selectedModel, setSelectedModel] = useState<AIModel>("google/gemini-2.0-flash-001")
   const [isLoaded, setIsLoaded] = useState(false)
+  const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false)
 
   // Load messages from localStorage on mount
   useEffect(() => {
@@ -195,10 +206,28 @@ export function ChatShell() {
   }, [abortController])
 
   const clearChat = useCallback(() => {
+    if (abortController) {
+      abortController.abort()
+      setAbortController(null)
+    }
+    setIsStreaming(false)
     setMessages([])
     setError(null)
-    localStorage.removeItem(STORAGE_KEY)
-  }, [])
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch (e) {
+      console.error("Failed to clear localStorage:", e)
+    }
+    setIsClearConfirmOpen(false)
+  }, [abortController])
+
+  const handleStartNewSession = useCallback(() => {
+    if (messages.length > 0) {
+      setIsClearConfirmOpen(true)
+    } else {
+      clearChat()
+    }
+  }, [messages.length, clearChat])
 
   return (
     <div
@@ -212,43 +241,42 @@ export function ChatShell() {
       <VideoBackground isStreaming={isStreaming} />
 
       {/* Top Header Bar */}
-      <header className="absolute top-3 left-4 right-4 z-20 flex items-center justify-between pointer-events-none" dir="rtl">
+      <header
+        id="chat-header-bar"
+        className="absolute top-2.5 sm:top-3 left-3 right-3 sm:left-4 sm:right-4 z-20 flex items-center justify-between gap-2 pointer-events-none"
+        dir="rtl"
+      >
         <div
-          className="flex items-center gap-2 pointer-events-auto bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-stone-200/60 shadow-xs"
-          style={{
-            paddingTop: "8px",
-            marginLeft: "-1px",
-            marginTop: "-2px",
-            marginBottom: "-7px",
-            marginRight: "150px",
-          }}
+          className="flex items-center gap-2 pointer-events-auto bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-stone-200/80 shadow-xs max-w-[65%] sm:max-w-none"
         >
           <img
             src="/assets/noa-profile.png"
             alt="נועה AI - ח. סבן"
-            className="w-6 h-6 rounded-full object-cover object-top border border-blue-600 shadow-2xs"
+            className="w-6 h-6 rounded-full object-cover object-top border border-blue-600 shadow-2xs shrink-0"
             referrerPolicy="no-referrer"
           />
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs font-bold text-stone-800">נועה AI</span>
-          <span className="text-red-500 text-xs">❤️</span>
-          <span className="text-stone-300 text-xs">|</span>
-          <span className="text-xs font-medium text-stone-600 hidden sm:inline">ח. סבן חומרי בניין (1994) בע״מ</span>
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+          <span className="text-xs font-bold text-stone-800 shrink-0">נועה AI</span>
+          <span className="text-red-500 text-xs shrink-0">❤️</span>
           <span className="text-stone-300 text-xs hidden sm:inline">|</span>
-          <span className="text-xs font-semibold text-emerald-800">ראמי מסארוה</span>
+          <span className="text-xs font-medium text-stone-600 hidden md:inline truncate">ח. סבן חומרי בניין (1994) בע״מ</span>
+          <span className="text-stone-300 text-xs hidden sm:inline">|</span>
+          <span className="text-xs font-semibold text-emerald-800 truncate">ראמי מסארוה</span>
         </div>
 
-        <div className="flex items-center gap-2 pointer-events-auto">
+        <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto shrink-0">
           <PWAInstallButton />
           <Button
-            onClick={clearChat}
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 rounded-full bg-white/80 hover:bg-white text-stone-600 backdrop-blur-md border border-stone-200/60 shadow-xs"
-            aria-label="Reset chat"
-            title="איפוס שיחה"
+            id="clear-history-button"
+            onClick={handleStartNewSession}
+            variant="outline"
+            size="sm"
+            className="h-8 sm:h-9 px-2.5 sm:px-3 rounded-full bg-white/90 hover:bg-white text-stone-700 hover:text-stone-900 border border-stone-200/80 shadow-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer font-medium text-xs backdrop-blur-md"
+            aria-label="התחל שיחה חדשה ונקה היסטוריה"
+            title="מחיקת היסטוריית השיחה והתחלת סשן חדש"
           >
-            <MessageSquareDashed className="w-4 h-4" />
+            <RotateCcw className="w-3.5 h-3.5 text-stone-500" />
+            <span className="font-semibold text-xs">שיחה חדשה</span>
           </Button>
         </div>
       </header>
@@ -274,6 +302,41 @@ export function ChatShell() {
       />
 
       <OfflineIndicator />
+
+      {/* Confirmation Dialog for Clearing Chat and Starting New Session */}
+      <AlertDialog open={isClearConfirmOpen} onOpenChange={setIsClearConfirmOpen}>
+        <AlertDialogContent
+          id="clear-chat-dialog"
+          className="max-w-md bg-white border border-stone-200 shadow-2xl rounded-2xl p-6"
+          dir="rtl"
+        >
+          <AlertDialogHeader className="text-right space-y-2">
+            <AlertDialogTitle className="text-base sm:text-lg font-bold text-stone-900 flex items-center gap-2">
+              <RotateCcw className="w-5 h-5 text-amber-600 shrink-0" />
+              <span>להתחיל שיחה חדשה?</span>
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-stone-600 text-sm leading-relaxed text-right">
+              פעולה זו תמחק את כל היסטוריית ההודעות בשיחה הנוכחית עם נועה, ותפתח סשן עבודה חדש ונקי.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse justify-start gap-2.5 mt-5 sm:space-x-0">
+            <AlertDialogAction
+              id="confirm-clear-history-button"
+              onClick={clearChat}
+              className="bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-xl text-xs font-semibold px-4 py-2.5 flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>כן, נקה והתחל שיחה חדשה</span>
+            </AlertDialogAction>
+            <AlertDialogCancel
+              id="cancel-clear-history-button"
+              className="rounded-xl text-xs font-medium px-4 py-2.5 border-stone-200 hover:bg-stone-100 text-stone-700 cursor-pointer"
+            >
+              ביטול
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
