@@ -112,6 +112,103 @@ async function matchCatalogFromFirestore(text: string) {
   }
 }
 
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/**
+ * מנתב מודלים חכם: Gemini ⬅️ OpenAI ⬅️ Claude
+ */
+export async function generateWithProviderFallback(
+  systemInstruction: string,
+  messages: ChatMessage[]
+): Promise<string> {
+  // 1. ניסיון ראשי: Gemini
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const contents = messages.map(m => ({
+        role: m.role === "assistant" ? "model" : "user",
+        parts: [{ text: m.content }],
+      }));
+
+      const res = await ai.models.generateContent({
+        model: "gemini-3.6-flash",
+        contents,
+        config: { systemInstruction },
+      });
+
+      if (res.text) return res.text;
+    } catch (err: any) {
+      console.warn("Gemini נכשל או חרג ממכסה (429/503), עובר ל-OpenAI...");
+    }
+  }
+
+  // 2. גיבוי ראשון: OpenAI (GPT-4o-mini)
+  if (process.env.OPENAI_API_KEY) {
+    try {
+      const openAiMessages = [
+        { role: "system", content: systemInstruction },
+        ...messages.map(m => ({ role: m.role, content: m.content }))
+      ];
+
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: openAiMessages,
+          temperature: 0.3,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.choices?.[0]?.message?.content) {
+        return data.choices[0].message.content;
+      }
+    } catch (err) {
+      console.warn("OpenAI נכשל או חרג ממכסה, עובר ל-Anthropic...");
+    }
+  }
+
+  // 3. גיבוי שני: Anthropic (Claude 3.5 Haiku)
+  if (process.env.ANTHROPIC_API_KEY) {
+    try {
+      const anthropicMessages = messages.map(m => ({
+        role: m.role === "assistant" ? "assistant" : "user",
+        content: m.content
+      }));
+
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-3-5-haiku-20241022",
+          max_tokens: 1500,
+          system: systemInstruction,
+          messages: anthropicMessages,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.content?.[0]?.text) {
+        return data.content[0].text;
+      }
+    } catch (err) {
+      console.error("גם Anthropic נכשל:", err);
+    }
+  }
+
+  throw new Error("כל ספקי ה-AI (Gemini, OpenAI, Anthropic) מוצו או אינם זמינים כרגע.");
+}
 /**
  * POST /api/chat
  *
