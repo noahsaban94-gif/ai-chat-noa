@@ -772,7 +772,7 @@ ${matchedClientPrompt}
       const errMsg = err instanceof Error ? err.message : String(err)
       console.warn("Primary model error, attempting fallback:", errMsg)
       responseStream = await ai.models.generateContentStream({
-        model: "gemini-2.5-flash-lite",
+        model: "gemini-3.8-flash",
         contents,
         config: {
           systemInstruction,
