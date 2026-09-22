@@ -417,8 +417,9 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
               style={{
                 minHeight: "56px",
                 maxHeight: "220px",
-                borderWidth: "1px",
-                borderRadius: "1rem",
+                borderStyle: "double",
+                borderRadius: "19px",
+                borderWidth: "6.888889px",
               }}
               aria-label="Message input"
             />
