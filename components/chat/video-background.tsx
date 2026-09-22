@@ -216,6 +216,13 @@ export function VideoBackground({ isStreaming, className = "" }: VideoBackground
               id="video-background-settings-button"
               variant="ghost"
               size="icon"
+              style={{
+                marginRight: "11px",
+                marginBottom: "7px",
+                paddingBottom: "2px",
+                marginLeft: "8px",
+                marginTop: "-12px",
+              }}
               className={`h-10 w-10 rounded-full transition-all duration-300 shadow-sm ${
                 config.enabled
                   ? isStreaming

@@ -197,7 +197,16 @@ export function ChatShell() {
 
       {/* Top Header Bar */}
       <header className="absolute top-3 left-4 right-4 z-20 flex items-center justify-between pointer-events-none" dir="rtl">
-        <div className="flex items-center gap-2 pointer-events-auto bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-stone-200/60 shadow-xs">
+        <div
+          className="flex items-center gap-2 pointer-events-auto bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-stone-200/60 shadow-xs"
+          style={{
+            paddingTop: "8px",
+            marginLeft: "-1px",
+            marginTop: "-2px",
+            marginBottom: "-7px",
+            marginRight: "200px",
+          }}
+        >
           <img
             src="/assets/noa-profile.png"
             alt="נועה AI - ח. סבן"
