@@ -5,8 +5,14 @@ import { AnimatedOrb } from "./animated-orb"
 export function TypingIndicator() {
   return (
     <div className="flex gap-3 max-w-[90%] md:max-w-[80%] mr-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <div className="shrink-0">
-        <AnimatedOrb size={32} />
+      <div className="shrink-0 relative">
+        <img
+          src="/assets/noa-profile.png"
+          alt="נועה AI - ח. סבן"
+          className="w-8 h-8 rounded-full object-cover object-top border-2 border-blue-600 shadow-sm"
+          referrerPolicy="no-referrer"
+        />
+        <span className="absolute -top-1 -right-1 text-[10px] select-none leading-none">❤️</span>
       </div>
 
       {/* Typing dots */}

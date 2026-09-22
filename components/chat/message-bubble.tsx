@@ -33,23 +33,29 @@ export function MessageBubble({ message, isStreaming = false, onActionClick }: M
       {/* Avatar */}
       <div
         className={cn(
-          "w-8 h-8 rounded-full flex items-center justify-center shrink-0 relative",
-          isUser ? "bg-white border border-emerald-500/20" : "bg-emerald-600",
+          "w-10 h-10 rounded-full flex items-center justify-center shrink-0 relative",
+          isUser ? "bg-white border border-emerald-500/20" : "",
           !isUser && isStreaming && "sticky bottom-4 self-end transition-all duration-300",
         )}
         style={{
-          boxShadow:
-            "rgba(14, 63, 126, 0.04) 0px 0px 0px 1px, rgba(42, 51, 69, 0.04) 0px 1px 1px -0.5px, rgba(42, 51, 70, 0.04) 0px 3px 3px -1.5px, rgba(42, 51, 70, 0.04) 0px 6px 6px -3px, rgba(14, 63, 126, 0.04) 0px 12px 12px -6px, rgba(14, 63, 126, 0.04) 0px 24px 24px -12px",
+          boxShadow: isUser
+            ? "rgba(14, 63, 126, 0.04) 0px 0px 0px 1px, rgba(42, 51, 69, 0.04) 0px 1px 1px -0.5px, rgba(42, 51, 70, 0.04) 0px 3px 3px -1.5px, rgba(42, 51, 70, 0.04) 0px 6px 6px -3px, rgba(14, 63, 126, 0.04) 0px 12px 12px -6px, rgba(14, 63, 126, 0.04) 0px 24px 24px -12px"
+            : "none",
         }}
         aria-hidden="true"
       >
         {isUser ? (
-          <span className="text-xs font-bold text-emerald-700">ר</span>
+          <span className="text-sm font-bold text-emerald-700">ר</span>
         ) : (
-          <>
-            <AnimatedOrb className="w-8 h-8 shrink-0" />
-            <span className="absolute -top-1 -right-1 text-[10px] select-none leading-none">❤️</span>
-          </>
+          <div className="relative">
+            <img
+              src="/assets/noa-profile.png"
+              alt="נועה AI - ח. סבן"
+              className="w-10 h-10 rounded-full object-cover object-top border-2 border-blue-600 shadow-sm"
+              referrerPolicy="no-referrer"
+            />
+            <span className="absolute -top-1 -right-1 text-[11px] select-none leading-none">❤️</span>
+          </div>
         )}
       </div>
 

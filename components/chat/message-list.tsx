@@ -141,7 +141,12 @@ export function MessageList({ messages, isStreaming, error, onRetry, isLoaded, o
       {messages.length === 0 && !error && !isStreaming && (
         <div className="flex flex-col items-center justify-center h-full text-center text-stone-600 px-4" dir="rtl">
           <div className={`mb-4 relative ${hasAnimated ? "orb-intro" : ""}`}>
-            <AnimatedOrb size={120} />
+            <img
+              src="/assets/noa-profile.png"
+              alt="נועה AI - ח. סבן"
+              className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover object-top border-4 border-blue-600 shadow-md ring-4 ring-blue-100/70"
+              referrerPolicy="no-referrer"
+            />
             <span className="absolute -bottom-1 -left-1 text-2xl select-none filter drop-shadow">❤️</span>
           </div>
           <h1 className={`text-2xl font-bold text-stone-800 ${hasAnimated ? "text-blur-intro" : ""}`}>

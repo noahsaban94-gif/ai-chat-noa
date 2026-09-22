@@ -2,9 +2,10 @@
 
 import { cn } from "@/lib/utils"
 import type React from "react"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { AnalysisWordSpan } from "./analysis-word-span"
 import { Sparkles } from "lucide-react"
+import parse, { HTMLReactParserOptions, Element, DOMNode, domToReact } from "html-react-parser"
 
 interface MarkdownRendererProps {
   content: string
@@ -42,32 +43,116 @@ export function MarkdownRenderer({
     }
   }, [animatingContent])
 
-  // Extract quick chips if present in content
-  const extractQuickChips = (text: string): { cleanedText: string; chips: string[] } => {
+  // Extract quick chips (either from Markdown 🔘 [ ... ] or standalone)
+  const extractMarkdownChips = (text: string): { cleanedText: string; chips: string[] } => {
+    let workingText = text
     const chips: string[] = []
-    
-    // Look for quick-chips block
-    const quickChipsRegex = /<div[^>]*class=["'][^"']*quick-chips[^"']*["'][^>]*>([\s\S]*?)<\/div>/i
-    const match = text.match(quickChipsRegex)
-    
-    if (match) {
-      const innerHtml = match[1]
-      // Extract button texts
-      const buttonRegex = /<button[^>]*>([\s\S]*?)<\/button>/gi
-      let btnMatch
-      while ((btnMatch = buttonRegex.exec(innerHtml)) !== null) {
-        // Strip any inner html tags
-        const chipText = btnMatch[1].replace(/<[^>]+>/g, "").trim()
-        if (chipText) {
-          chips.push(chipText)
-        }
+
+    // Look for Markdown button syntax: 🔘 `[ ... ]` or 🔘 [ ... ]
+    const mdButtonRegex = /🔘\s*`?\[\s*([^\]`]+?)\s*\]`?/gi
+    let mdMatch
+    const matchedSpans: string[] = []
+    while ((mdMatch = mdButtonRegex.exec(workingText)) !== null) {
+      matchedSpans.push(mdMatch[0])
+      const chipText = mdMatch[1].trim()
+      if (chipText && !chips.includes(chipText)) {
+        chips.push(chipText)
       }
-      const cleaned = text.replace(quickChipsRegex, "").trim()
-      return { cleanedText: cleaned, chips }
     }
 
-    // Also look for fallback patterns like [פעולה 1] [פעולה 2] at the end
-    return { cleanedText: text, chips }
+    if (matchedSpans.length > 0) {
+      workingText = workingText.replace(/---\s*(\n\s*🔘[\s\S]*)$/, "").trim()
+      for (const span of matchedSpans) {
+        workingText = workingText.replace(span, "").trim()
+      }
+    }
+
+    return { cleanedText: workingText, chips }
+  }
+
+  // Helper to extract text from a DOMNode
+  const getDomNodeText = (node: any): string => {
+    if (!node) return ""
+    if (node.type === "text") return node.data || ""
+    if (node.children && Array.isArray(node.children)) {
+      return node.children.map(getDomNodeText).join("")
+    }
+    return ""
+  }
+
+  // HTML parser options with Tailwind styling and interactive buttons
+  const parseOptions: HTMLReactParserOptions = {
+    replace(domNode) {
+      if (domNode instanceof Element) {
+        // Interactive Quick Chip Button
+        if (domNode.name === "button") {
+          const rawClass = domNode.attribs.class || domNode.attribs.className || ""
+          const buttonText = getDomNodeText(domNode).trim()
+
+          return (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                if (buttonText) onActionClick?.(buttonText)
+              }}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-pointer shadow-xs transition-all active:scale-95 text-right my-1",
+                "bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 border border-slate-200 text-slate-700",
+                rawClass
+              )}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              <span>{domToReact(domNode.children as DOMNode[], parseOptions)}</span>
+            </button>
+          )
+        }
+
+        // Table container
+        if (domNode.name === "table") {
+          return (
+            <div className="overflow-x-auto my-3 rounded-xl border border-slate-200 shadow-xs" dir="rtl">
+              <table className={cn("w-full text-right text-xs", domNode.attribs.class, domNode.attribs.className)}>
+                {domToReact(domNode.children as DOMNode[], parseOptions)}
+              </table>
+            </div>
+          )
+        }
+
+        // Ordered List
+        if (domNode.name === "ol") {
+          return (
+            <ol className={cn("list-decimal list-inside space-y-1.5 my-2 pr-2 font-medium text-slate-700 text-xs sm:text-sm", domNode.attribs.class, domNode.attribs.className)}>
+              {domToReact(domNode.children as DOMNode[], parseOptions)}
+            </ol>
+          )
+        }
+
+        // Unordered List
+        if (domNode.name === "ul") {
+          return (
+            <ul className={cn("list-disc list-inside space-y-1.5 my-2 pr-2 font-medium text-slate-700 text-xs sm:text-sm", domNode.attribs.class, domNode.attribs.className)}>
+              {domToReact(domNode.children as DOMNode[], parseOptions)}
+            </ul>
+          )
+        }
+
+        // Quick chips container
+        if (domNode.attribs.class?.includes("quick-chips") || domNode.attribs.className?.includes("quick-chips")) {
+          return (
+            <div className={cn("quick-chips flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-200/80", domNode.attribs.class, domNode.attribs.className)} dir="rtl">
+              {domToReact(domNode.children as DOMNode[], parseOptions)}
+            </div>
+          )
+        }
+      }
+    },
+  }
+
+  // Check if string contains HTML tags
+  const hasHtml = (str: string) => {
+    return /<\/?(?:div|p|span|table|thead|tbody|tr|th|td|ol|ul|li|button|h[1-6]|strong|em|b|i|br|pre|code|hr|a)\b/i.test(str)
   }
 
   const renderPlainInlineMarkdown = (text: string) => {
@@ -324,16 +409,22 @@ export function MarkdownRenderer({
         return renderCodeBlock(part, partIndex)
       }
 
-      // Check for raw HTML table or div block
-      if (part.includes("<div") && part.includes("<table")) {
-        return (
-          <div
-            key={partIndex}
-            dir="rtl"
-            dangerouslySetInnerHTML={{ __html: part }}
-            className="my-2"
-          />
-        )
+      // Check for HTML content
+      if (hasHtml(part)) {
+        try {
+          // Pre-convert simple inline markdown bold/italic if mixed inside HTML
+          const processedHtml = part
+            .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+            .replace(/(^|[^*])\*([^*]+)\*([^*]|$)/g, "$1<em>$2</em>$3")
+
+          return (
+            <div key={partIndex} className="my-1.5 whitespace-normal break-words leading-relaxed html-rendered-content" dir="rtl">
+              {parse(processedHtml, parseOptions)}
+            </div>
+          )
+        } catch (e) {
+          console.error("HTML parsing error, falling back to markdown:", e)
+        }
       }
 
       // Check for markdown table
@@ -361,7 +452,7 @@ export function MarkdownRenderer({
 
   // Extract quick chips from combined content
   const combinedContent = content || ""
-  const { cleanedText, chips } = extractQuickChips(combinedContent)
+  const { cleanedText, chips } = extractMarkdownChips(combinedContent)
 
   // Split cleanedText into static and animating
   const currentStatic = isStreaming ? cleanedText.slice(0, staticContent.length) : cleanedText
