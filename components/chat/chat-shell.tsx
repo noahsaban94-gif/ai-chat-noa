@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import { VideoBackground } from "./video-background"
 import { PWAInstallButton } from "@/components/pwa/pwa-install-button"
 import { OfflineIndicator } from "@/components/pwa/offline-indicator"
-import { SenderSelector, PRESET_SENDERS, type SenderOption } from "./sender-selector"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,7 +45,6 @@ export function ChatShell() {
   const [selectedModel, setSelectedModel] = useState<AIModel>("google/gemini-2.0-flash-001")
   const [isLoaded, setIsLoaded] = useState(false)
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false)
-  const [senderPhone, setSenderPhone] = useState<string>("972508860896") // ברירת מחדל: ראמי מסארוה
 
   // Load messages from localStorage on mount
   useEffect(() => {
@@ -141,7 +139,6 @@ export function ChatShell() {
             model: selectedModel,
             currentDate: `יום ${clientDate}`,
             currentTime: clientTime,
-            senderPhone,
           }),
           signal: controller.signal,
         })
@@ -188,7 +185,7 @@ export function ChatShell() {
         setAbortController(null)
       }
     },
-    [messages, isStreaming, selectedModel, senderPhone],
+    [messages, isStreaming, selectedModel],
   )
 
   const retry = useCallback(() => {
@@ -250,7 +247,7 @@ export function ChatShell() {
         dir="rtl"
       >
         <div
-          className="flex items-center gap-2 pointer-events-auto bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-stone-200/80 shadow-xs max-w-[70%] sm:max-w-none"
+          className="flex items-center gap-2 pointer-events-auto bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-stone-200/80 shadow-xs max-w-[65%] sm:max-w-none"
         >
           <img
             src="/assets/noa-profile.png"
@@ -262,12 +259,9 @@ export function ChatShell() {
           <span className="text-xs font-bold text-stone-800 shrink-0">נועה AI</span>
           <span className="text-red-500 text-xs shrink-0">❤️</span>
           <span className="text-stone-300 text-xs hidden sm:inline">|</span>
-          <span className="text-xs font-medium text-stone-600 hidden lg:inline truncate">ח. סבן חומרי בניין</span>
+          <span className="text-xs font-medium text-stone-600 hidden md:inline truncate">ח. סבן חומרי בניין (1994) בע״מ</span>
           <span className="text-stone-300 text-xs hidden sm:inline">|</span>
-          <SenderSelector
-            currentSenderPhone={senderPhone}
-            onSelectSender={(sender) => setSenderPhone(sender.phone)}
-          />
+          <span className="text-xs font-semibold text-emerald-800 truncate">ראמי מסארוה</span>
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto shrink-0">

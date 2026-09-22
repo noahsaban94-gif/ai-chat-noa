@@ -188,20 +188,18 @@ export function MessageList({ messages, isStreaming, error, onRetry, isLoaded, o
           <h1 className={`text-2xl font-bold text-stone-800 ${hasAnimated ? "text-blur-intro" : ""}`}>
             שלום ראמי, אני נועה AI ❤️
           </h1>
-          <p className={`text-sm mt-1 text-stone-600 max-w-md ${hasAnimated ? "text-blur-intro-delay" : ""}`}>
-            השותפה והמוח הלוגיסטי-תפעולי שלך בחברת <strong className="text-stone-800 font-semibold">״ח. סבן חומרי בניין (1994) בע״מ״</strong>
-          </p>
+
           <p className="text-xs text-stone-600 mt-1 max-w-sm">
-            ערוץ השיחה הפרטי לניהול משימות שוטף, סידור עבודה, סיעור מוחות והחלטות אסטרטגיות.
+            ערוץ השיחה הפרטי לניהול משימות שוטף, סידור עבודה,ממתינה.
           </p>
 
           {/* Quick starter chips */}
           <div className="flex flex-wrap items-center justify-center gap-2 mt-6 max-w-lg">
             {[
-              { icon: "📦", text: "היי ראמי תביא לי דחוף לחורש 21 כפר שמריהו 3 בלות חול ומשטח מלט, תרים מעבר לגדר" },
-              { icon: "📋", text: "סידור עבודה יומי לנהגים (חכמת מנוף ועלי חלוקה)" },
-              { icon: "🏗️", text: "בדיקת סטטוס מלאי חצר ובלות אצל אורן" },
-              { icon: "💰", text: "בירור מחיר והנחה על בלוקים (הפניה לאיציק זהבי)" },
+              { icon: "📋", text: "סידור עבודה יומי לנהגים ולמשאיות" },
+              { icon: "🏗️", text: "בדיקת סטטוס מלאי חומרי בניין והזמנות רכש" },
+              { icon: "💡", text: "סיעור מוחות לפיתוח וייעול לוגיסטי" },
+              { icon: "⏱️", text: "מעקב אספקות וסגירת קצוות פתוחים" },
             ].map((item, idx) => (
               <button
                 key={idx}
