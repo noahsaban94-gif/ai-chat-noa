@@ -70,6 +70,13 @@ export function MessageBubble({ message, isStreaming = false }: MessageBubblePro
             className={cn(isUser ? "px-4 py-3" : "py-1")}
             style={{
               transition: "max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease",
+              ...(!isUser
+                ? {
+                    fontWeight: "bold",
+                    fontFamily: "system-ui",
+                    fontSize: "15px",
+                  }
+                : {}),
             }}
           >
             {isUser ? (
@@ -88,7 +95,11 @@ export function MessageBubble({ message, isStreaming = false }: MessageBubblePro
                 <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
               </div>
             ) : (
-              <MarkdownRenderer content={message.content || " "} isStreaming={isStreaming} />
+              <MarkdownRenderer
+                content={message.content || " "}
+                isStreaming={isStreaming}
+                className="text-[15px] font-bold [font-family:system-ui]"
+              />
             )}
           </div>
         </div>

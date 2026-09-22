@@ -5,6 +5,7 @@ import { MessageSquareDashed } from "lucide-react"
 import { MessageList } from "./message-list"
 import { Composer, type AIModel } from "./composer"
 import { Button } from "@/components/ui/button"
+import { VideoBackground } from "./video-background"
 
 // Data model for messages
 export interface Message {
@@ -185,23 +186,28 @@ export function ChatShell() {
 
   return (
     <div
-      className="relative h-dvh bg-stone-50"
+      className="relative h-dvh bg-stone-50 overflow-hidden"
       style={{
         boxShadow:
           "rgba(14, 63, 126, 0.04) 0px 0px 0px 1px, rgba(42, 51, 69, 0.04) 0px 1px 1px -0.5px, rgba(42, 51, 70, 0.04) 0px 3px 3px -1.5px, rgba(42, 51, 70, 0.04) 0px 6px 6px -3px, rgba(14, 63, 126, 0.04) 0px 12px 12px -6px, rgba(14, 63, 126, 0.04) 0px 24px 24px -12px",
       }}
     >
+      {/* Semi-transparent Thinking Video Background & Controls */}
+      <VideoBackground isStreaming={isStreaming} />
+
       <Button
         onClick={clearChat}
         variant="ghost"
         size="icon"
-        className="absolute top-4 left-4 z-20 h-10 w-10 rounded-full bg-zinc-100 hover:bg-zinc-200 text-stone-600"
+        className="absolute top-4 left-4 z-20 h-10 w-10 rounded-full bg-zinc-100/90 hover:bg-zinc-200 text-stone-600 backdrop-blur-xs"
         aria-label="Reset chat"
       >
         <MessageSquareDashed className="w-5 h-5" />
       </Button>
 
-      <MessageList messages={messages} isStreaming={isStreaming} error={error} onRetry={retry} isLoaded={isLoaded} />
+      <div className="relative z-10 h-full w-full">
+        <MessageList messages={messages} isStreaming={isStreaming} error={error} onRetry={retry} isLoaded={isLoaded} />
+      </div>
 
       <Composer
         onSend={sendMessage}

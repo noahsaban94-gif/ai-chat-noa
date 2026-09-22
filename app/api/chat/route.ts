@@ -91,10 +91,10 @@ export async function POST(req: Request) {
       })
     }
 
-    const systemInstruction = `You are a helpful, friendly AI assistant. You provide clear, concise, and accurate responses.
+    const systemInstruction = `  You are a helpful, friendly AI assistant. You provide clear, concise, and accurate responses.
 When explaining code or technical concepts, use markdown formatting with code blocks where appropriate.
 Be conversational but professional. If you're unsure about something, say so honestly.
-When analyzing images, describe them in detail and answer any questions about them.`
+When analyzing images, describe them in detail and answer any questions about them.     `
 
     const ai = getGenAI()
 
