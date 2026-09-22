@@ -157,7 +157,7 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
       recognitionRef.current.stop()
       setIsRecording(false)
     }
-    onSend(value || "Describe this image", uploadedImage || undefined)
+    onSend(value || "נועה תציצ בתמונה ", uploadedImage || undefined)
     setValue("")
     setUploadedImage(null)
     baseTextRef.current = ""

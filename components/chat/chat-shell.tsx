@@ -82,7 +82,7 @@ export function ChatShell() {
       const userMessage: Message = {
         id: generateId(),
         role: "user",
-        content: content.trim() || "Describe this image",
+        content: content.trim() || "נועה תציצ בתמונה ",
         createdAt: new Date(),
         imageData,
       }
@@ -206,7 +206,7 @@ export function ChatShell() {
             marginLeft: "-1px",
             marginTop: "-2px",
             marginBottom: "-7px",
-            marginRight: "200px",
+            marginRight: "150px",
           }}
         >
           <img
