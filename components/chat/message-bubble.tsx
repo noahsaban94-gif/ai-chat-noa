@@ -234,6 +234,14 @@ export function MessageBubble({ message, isStreaming = false, onActionClick }: M
                 isStreaming={isStreaming}
                 onActionClick={onActionClick}
                 className="text-[15px] font-bold [font-family:system-ui]"
+                style={
+                  message.id === "OIhXf4iq5qKDJYMSSYQd"
+                    ? {
+                        color: "#17065b",
+                        fontFamily: "Arial",
+                      }
+                    : undefined
+                }
               />
             )}
           </div>

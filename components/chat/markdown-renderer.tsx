@@ -12,6 +12,7 @@ interface MarkdownRendererProps {
   className?: string
   isStreaming?: boolean
   onActionClick?: (action: string) => void
+  style?: React.CSSProperties
 }
 
 export function MarkdownRenderer({
@@ -19,6 +20,7 @@ export function MarkdownRenderer({
   className,
   isStreaming = false,
   onActionClick,
+  style,
 }: MarkdownRendererProps) {
   const [staticContent, setStaticContent] = useState("")
   const [animatingContent, setAnimatingContent] = useState("")
@@ -459,7 +461,11 @@ export function MarkdownRenderer({
   const currentAnimating = isStreaming ? cleanedText.slice(staticContent.length) : ""
 
   return (
-    <div className={cn("text-sm whitespace-pre-wrap break-words leading-relaxed", className)} dir="rtl">
+    <div
+      className={cn("text-sm whitespace-pre-wrap break-words leading-relaxed", className)}
+      style={style}
+      dir="rtl"
+    >
       {renderContent(currentStatic, false)}
       {renderContent(currentAnimating, true)}
 

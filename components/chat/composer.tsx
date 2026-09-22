@@ -51,13 +51,22 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
   const speechRecognitionTextRef = useRef("")
   const baseTextRef = useRef("")
 
-  const handleInput = useCallback(() => {
+  const adjustTextareaHeight = useCallback(() => {
     const textarea = textareaRef.current
     if (textarea) {
       textarea.style.height = "auto"
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
+      const targetHeight = Math.min(Math.max(textarea.scrollHeight, 56), 220)
+      textarea.style.height = `${targetHeight}px`
     }
   }, [])
+
+  useEffect(() => {
+    adjustTextareaHeight()
+  }, [value, adjustTextareaHeight])
+
+  const handleInput = useCallback(() => {
+    adjustTextareaHeight()
+  }, [adjustTextareaHeight])
 
   const initRecognition = useCallback(() => {
     if (typeof window === "undefined") return null
@@ -354,6 +363,8 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
             "focus-within:border-stone-300 focus-within:ring-2 focus-within:ring-stone-200",
           )}
           style={{
+            minHeight: "171px",
+            height: "auto",
             boxShadow:
               "rgba(14, 63, 126, 0.06) 0px 0px 0px 1px, rgba(42, 51, 69, 0.06) 0px 1px 1px -0.5px, rgba(42, 51, 70, 0.06) 0px 3px 3px -1.5px, rgba(42, 51, 70, 0.06) 0px 6px 6px -3px, rgba(14, 63, 126, 0.06) 0px 12px 12px -6px, rgba(14, 63, 126, 0.06) 0px 24px 24px -12px",
           }}
@@ -399,10 +410,16 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
               rows={1}
               dir="auto"
               className={cn(
-                "flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-stone-800 placeholder:text-stone-400 text-right",
+                "flex-1 resize-none bg-transparent px-3.5 py-2.5 text-sm text-stone-800 placeholder:text-stone-400 text-right",
                 "focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed",
-                "max-h-[56px] overflow-y-auto",
+                "min-h-[56px] max-h-[220px] border border-stone-200/80 rounded-2xl overflow-y-auto transition-[height] duration-150 ease-out",
               )}
+              style={{
+                minHeight: "56px",
+                maxHeight: "220px",
+                borderWidth: "1px",
+                borderRadius: "1rem",
+              }}
               aria-label="Message input"
             />
 
@@ -445,7 +462,14 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div
+            className="flex items-center gap-2"
+            style={{
+              marginLeft: "3px",
+              marginTop: "2px",
+              marginRight: "64px",
+            }}
+          >
             <input
               ref={fileInputRef}
               type="file"
