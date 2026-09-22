@@ -3,7 +3,19 @@ import { HISTORICAL_63_CLIENTS, findBestClientMatch, searchClients } from "@/lib
 import { TRAINING_PRODUCTS, findTrainingVideos } from "@/lib/training-videos"
 import { sendOneSignalPush } from "@/lib/onesignal"
 import { db } from "@/lib/firebase-auth"
-import { doc, getDoc, updateDoc, collection, addDoc, serverTimestamp, arrayUnion } from "firebase/firestore"
+import {
+  doc,
+  getDoc,
+  getDocs,
+  updateDoc,
+  collection,
+  addDoc,
+  serverTimestamp,
+  arrayUnion,
+  query,
+  where,
+  limit,
+} from "firebase/firestore"
 import type { AuthorizedUser } from "@/lib/types/device-auth"
 
 let aiClient: GoogleGenAI | null = null
@@ -14,6 +26,90 @@ function getGenAI(): GoogleGenAI {
     aiClient = new GoogleGenAI({ apiKey })
   }
   return aiClient
+}
+
+/**
+ * 1. שליפת הזמנות עבר מתוך קולקציית orders ב-Firestore
+ */
+async function getClientPastOrdersFromFirestore(comaxIdOrName: string) {
+  if (!db || !comaxIdOrName) return []
+  try {
+    const ordersCol = collection(db, "orders")
+    const cleanQuery = String(comaxIdOrName).trim()
+
+    // חיפוש לפי מספר קומקס
+    const qByComax = query(ordersCol, where("comaxId", "==", cleanQuery), limit(3))
+    let snap = await getDocs(qByComax)
+
+    // אם לא נמצא לפי קומקס, חיפוש לפי שם לקוח
+    if (snap.empty) {
+      const qByName = query(ordersCol, where("clientName", "==", cleanQuery), limit(3))
+      snap = await getDocs(qByName)
+    }
+
+    return snap.docs.map((dSnap) => {
+      const d = dSnap.data()
+      let dateStr = ""
+      if (d.receiptDate?.seconds) {
+        dateStr = new Date(d.receiptDate.seconds * 1000).toLocaleDateString("he-IL")
+      } else if (d.receiptDate) {
+        dateStr = String(d.receiptDate)
+      }
+
+      return {
+        orderId: d.orderId,
+        date: dateStr,
+        products: d.rawProducts,
+        driver: d.assignedDriver,
+        warehouse: d.warehouse,
+        status: d.deliveryStatus,
+      }
+    })
+  } catch (err) {
+    console.warn("שגיאה בשליפת הזמנות עבר מ-Firestore:", err)
+    return []
+  }
+}
+
+/**
+ * 2. איתור מק"טים תואמים מתוך logistics_catalog ב-Firestore
+ */
+async function matchCatalogFromFirestore(text: string) {
+  if (!db || !text) return []
+  try {
+    const catalogSnap = await getDocs(collection(db, "logistics_catalog"))
+    const lowerText = text.toLowerCase()
+    const matches: Array<{
+      sku: string
+      name: string
+      category?: string
+      warehouse?: string
+      requiresBela?: boolean
+      requiresPallet?: boolean
+    }> = []
+
+    catalogSnap.forEach((docSnap) => {
+      const item = docSnap.data()
+      const aliases: string[] = Array.isArray(item.aliases) ? item.aliases : [item.officialName || ""]
+      const hasMatch = aliases.some((a: string) => a && lowerText.includes(String(a).toLowerCase()))
+
+      if (hasMatch) {
+        matches.push({
+          sku: item.sku,
+          name: item.officialName,
+          category: item.category,
+          warehouse: item.defaultWarehouse,
+          requiresBela: Boolean(item.requiresBelaDeposit),
+          requiresPallet: Boolean(item.requiresPalletDeposit),
+        })
+      }
+    })
+
+    return matches.slice(0, 5)
+  } catch (err) {
+    console.warn("שגיאה בסריקת logistics_catalog מ-Firestore:", err)
+    return []
+  }
 }
 
 /**
@@ -37,7 +133,14 @@ export async function POST(req: Request) {
     // 🔒 מנגנון נעילת מכשיר (Device Binding) ומניעת התחזות
     const clientIp = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown-ip"
     const userAgent = req.headers.get("user-agent") || ""
-    let verifiedUser: { userId: string; name: string; role: string; phone: string; boundDeviceModel?: string | null; boundDeviceId?: string | null } | null = null
+    let verifiedUser: {
+      userId: string
+      name: string
+      role: string
+      phone: string
+      boundDeviceModel?: string | null
+      boundDeviceId?: string | null
+    } | null = null
 
     if (db) {
       try {
@@ -48,7 +151,7 @@ export async function POST(req: Request) {
         if (userSnap.exists()) {
           const userData = userSnap.data() as AuthorizedUser
 
-          // איסוף כל מזהי המכשירים המאושרים (כולל boundDeviceId לתאימות לאחור)
+          // איסוף כל מזהי המכשירים המאושרים
           const allowedDevices: string[] = Array.isArray(userData.allowedDeviceIds)
             ? [...userData.allowedDeviceIds]
             : []
@@ -58,7 +161,7 @@ export async function POST(req: Request) {
 
           // בדיקה האם המשתמש כבר הופעל
           if (!userData.isActivated || allowedDevices.length === 0) {
-            // עבור ראמי בסביבת הפיתוח הראשונית - נעילת מכשיר אוטומטית אם טרם הופעל
+            // עבור ראמי בסביבת הפיתוח - נעילת מכשיר אוטומטית אם טרם הופעל
             if (targetUserId === "user_rami_masarweh" && deviceId) {
               await updateDoc(userDocRef, {
                 boundDeviceId: deviceId,
@@ -171,7 +274,7 @@ export async function POST(req: Request) {
         const commaIndex = msg.imageData.indexOf(",")
         if (commaIndex !== -1) {
           const mimeMatch = msg.imageData.substring(0, commaIndex).match(/data:(.*?);/)
-          const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg"
+          const mimeType = mimeMatch ? mimeMatch : "image/jpeg"
           const base64Data = msg.imageData.substring(commaIndex + 1)
           parts.push({
             inlineData: {
@@ -287,7 +390,33 @@ ${matchedClient.riskDetails ? `- **פרטי סיכון (riskDetails):** ${matche
     } else if (matchingClients.length > 0 && matchingClients.length <= 3) {
       matchedClientPrompt = `
 ### 🔍 לקוחות אפשריים שזוהו בהודעה:
-${matchingClients.map(c => `- לקוח קומקס ${c.comaxId}: ${c.name} (${c.address}, ${c.city}) - טלפון: ${c.contactPhone} - מק"ט מנוף: ${c.craneBarcode}, מק"ט פלטה: ${c.flatbedBarcode}`).join("\n")}
+${matchingClients.map((c) => `- לקוח קומקס ${c.comaxId}: ${c.name} (${c.address}, ${c.city}) - טלפון: ${c.contactPhone} - מק"ט מנוף: ${c.craneBarcode}, מק"ט פלטה: ${c.flatbedBarcode}`).join("\n")}
+`
+    }
+
+    // 🔥 שליפת נתוני אמת חיים מ-Firestore (הזמנות עבר + מק"טים מותאמים)
+    let firestoreContextPrompt = ""
+
+    const targetComaxId = matchedClient?.comaxId || ""
+    const targetClientName = matchedClient?.name || latestUserMessage
+
+    // 1. שליפת הזמנות עבר של הלקוח מ-Firestore
+    const pastOrders = await getClientPastOrdersFromFirestore(targetComaxId || targetClientName)
+    if (pastOrders.length > 0) {
+      firestoreContextPrompt += `
+### 📜 היסטוריית הזמנות עבר מתוך קולקציית orders ב-Firestore (מערכת מאוחדת):
+${pastOrders.map((o) => `- **הזמנה ${o.orderId}** (${o.date}) | מחסן: ${o.warehouse} \vert{} נהג: ${o.driver}
+  פירוט מוצרים שסופקו: ${o.products}
+  סטטוס אספקה: ${o.status || "סופק"}`).join("\n")}
+`
+    }
+
+    // 2. איתור מק"טים רלוונטיים מתוך קולקציית logistics_catalog ב-Firestore
+    const catalogMatches = await matchCatalogFromFirestore(latestUserMessage)
+    if (catalogMatches.length > 0) {
+      firestoreContextPrompt += `
+### 📦 מק"טים רשמיים שזוהו מתוך קולקציית logistics_catalog ב-Firestore:
+${catalogMatches.map((c) => `- מק"ט: **${c.sku}** | מוצר: ${c.name} \vert{} מחסן: ${c.warehouse} | פקדון בלה: ${c.requiresBela ? "חובה (60002)" : "פטור"} \vert{} פקדון משטח: ${c.requiresPallet ? "חובה (60060)" : "פטור"}`).join("\n")}
 `
     }
 
@@ -335,7 +464,7 @@ https://www.youtube.com/watch?v=[VIDEO_ID]
 - לעולם אל תצרפי את הקישור בתוך משפט; מקמי אותו בשורה נפרדת עם שורות ריקות מעליו ומתחתיו.
 
 מאגר סרטוני מוצרים לדוגמה לשליפה לפי מילות מפתח:
-${TRAINING_PRODUCTS.map((p) => `- מוצר: **${p.name}** (מק"ט: ${p.sku}) | מילות מפתח: [${p.keywords.slice(0, 6).join(", ")}]
+${TRAINING_PRODUCTS.map((p) => `- מוצר: **${p.name}** (מק"ט: ${p.sku}) \vert{} מילות מפתח: [${p.keywords.slice(0, 6).join(", ")}]
   קישור יוטיוב רשמי: ${p.youtubeUrl}
   שלבים מרכזיים: ${p.keyTechnicalSteps.slice(0, 2).join("; ")}`).join("\n")}
 ${
@@ -350,8 +479,9 @@ ${matchedTrainingVideos.slice(0, 2).map((v) => `* **${v.name}**
 }
 `
 
-    const verifiedIdentityBanner = verifiedUser ? `
-### 🔒 זהות משתמש מאומתת (Device Binding מאושר ומאומטח בחומרה):
+    const verifiedIdentityBanner = verifiedUser
+      ? `
+### 🔒 זהות משתמש מאומתת (Device Binding מאושר ומאובטח בחומרה):
 - **הודעה מאומתת מאת:** ${verifiedUser.name}
 - **תפקיד מוגדר בחברה:** ${verifiedUser.role}
 - **מספר טלפון מאושר:** ${verifiedUser.phone}
@@ -367,7 +497,8 @@ ${matchedTrainingVideos.slice(0, 2).map((v) => `* **${v.name}**
   * תמיר/דורון (סניף 1): גבס, פרופילים, צבע ובידוד בסניף התלמיד.
   * חכמת / עלי (נהגים): תעודות משלוח, ניווט Waze, כתובות, הנחיות פריקה בטוחה באתרים.
   * גליה (גבייה/הנה"ח): תנאי תשלום מראש, חובות, שקים והעברות בנקאיות.
-` : `
+`
+      : `
 [הודעה מאומתת מאת: ראמי מסארוה | תפקיד: מנהל תפעול וסדרן ראשי]
 `
 
@@ -377,6 +508,7 @@ ${matchedTrainingVideos.slice(0, 2).map((v) => `* **${v.name}**
 ${verifiedIdentityBanner}
 ${oneSignalStatusNote}
 ${trainingVideosPrompt}
+${firestoreContextPrompt}
 
 ---
 
@@ -420,31 +552,33 @@ rami_personal_dna: {
 ---
 
 ### 📂 מקור המידע הקשיח ללקוחות (Single Source of Truth):
-קובץ historicalClients.ts הוא מקור האמת הבלעדי של 63 לקוחות ואתרי החברה.
-להלן מאגר 63 הלקוחות הרשמיים המלא של סבן:
-${JSON.stringify(HISTORICAL_63_CLIENTS.map(c => ({
-  id: c.id,
-  comaxId: c.comaxId,
-  name: c.name,
-  city: c.city,
-  address: c.address,
-  district: c.district,
-  contactName: c.contactName,
-  contactPhone: c.contactPhone,
-  lat: c.lat,
-  lng: c.lng,
-  status: c.status,
-  craneBarcode: c.craneBarcode,
-  flatbedBarcode: c.flatbedBarcode,
-  craneUnloadMinutes: c.craneUnloadMinutes,
-  flatbedUnloadMinutes: c.flatbedUnloadMinutes,
-  paymentTerms: c.paymentTerms,
-  surchargePercent: c.surchargePercent,
-  basePriceNis: c.basePriceNis,
-  observations: c.observations,
-  riskDetails: c.riskDetails,
-  preferredDeliveryHours: c.preferredDeliveryHours,
-})))}
+קובץ historicalClients.ts ומאגר Firestore הם מקורות האמת של לקוחות ואתרי החברה.
+להלן נתוני 63 הלקוחות הרשמיים המלאים:
+${JSON.stringify(
+  HISTORICAL_63_CLIENTS.map((c) => ({
+    id: c.id,
+    comaxId: c.comaxId,
+    name: c.name,
+    city: c.city,
+    address: c.address,
+    district: c.district,
+    contactName: c.contactName,
+    contactPhone: c.contactPhone,
+    lat: c.lat,
+    lng: c.lng,
+    status: c.status,
+    craneBarcode: c.craneBarcode,
+    flatbedBarcode: c.flatbedBarcode,
+    craneUnloadMinutes: c.craneUnloadMinutes,
+    flatbedUnloadMinutes: c.flatbedUnloadMinutes,
+    paymentTerms: c.paymentTerms,
+    surchargePercent: c.surchargePercent,
+    basePriceNis: c.basePriceNis,
+    observations: c.observations,
+    riskDetails: c.riskDetails,
+    preferredDeliveryHours: c.preferredDeliveryHours,
+  }))
+)}
 
 ${matchedClientPrompt}
 
@@ -454,8 +588,9 @@ ${matchedClientPrompt}
 
 1. **זיהוי ונרמול לקוח:**
    בעת קבלת טקסט חופשי, תעודה, הקלטה קולית או הודעה בוואטסאפ:
-   - זהי את הלקוח לפי מספר טלפון (contactPhone), שם איש קשר (contactName), שם אתר (name), או כתובת (address/city) מתוך מאגר 63 הלקוחות.
+   - זהי את הלקוח לפי מספר טלפון (contactPhone), שם איש קשר (contactName), שם אתר (name), או כתובת (address/city).
    - הצמידי תמיד את מספר לקוח קומקס (comaxId) הרשמי ואת מזהה האתר (id).
+   - אם מופיעות בהקשר הזמנות עבר מקולקציית orders — הסתמכי עליהן לצורך שחזור סל מוצרים קבוע או היסטוריית כמויות.
 
 2. **נוהל בדיקת אשראי ובטיחות (חובה לבצע בכל הזמנה):**
    - **תנאי תשלום (paymentTerms):** אם מוגדר "מזומן / אשראי מראש" — חובה לסמן את ההזמנה בסטטוס: "⛔ ממתין לאישור תשלום מראש (גליה/לינה/הראל)". אין לאשר יציאה ללא תשלום.
@@ -463,9 +598,10 @@ ${matchedClientPrompt}
    - **תוספת מחיר (surchargePercent):** אם מוגדר 10%, יש לציין זאת בשורת ההובלה.
    - **שעות מועדפות (preferredDeliveryHours):** יש לשבץ את שעת האספקה אך ורק בתוך חלון הזמנים המוגדר.
 
-3. **שיוך מק"טי הובלה:**
+3. **שיוך מק"טי הובלה ופקדונות:**
    - **מנוף (חכמת | מרצדס):** שייכי את מק"ט ה-craneBarcode המדויק של הלקוח.
    - **פלטה/חלוקה (עלי | איסוזו):** שייכי את מק"ט ה-flatbedBarcode (סדרת 818xxx) והחילי פטור מלא מפקדונות בלות ומשטחים.
+   - **חוקי פקדונות חובה:** על כל בלה מחייבים שק גדול פקדון מק"ט 60002 ביחס 1:1. על כל 40 שקי מלט/דבק מוסיפים משטח סבן פקדון 60060.
 
 4. **מבנה פלט קבוע לוואטסאפ (כרטיס סידור):**
    בכל פינוח או סידור הזמנה, הפלט שלך ינוסח בדיוק לפי המבנה המחייב הבא:
@@ -529,7 +665,7 @@ ${matchedClientPrompt}
     let responseStream
     try {
       responseStream = await ai.models.generateContentStream({
-        model: "gemini-3.6-flash",
+        model: "gemini-2.5-flash",
         contents,
         config: {
           systemInstruction,
@@ -539,7 +675,7 @@ ${matchedClientPrompt}
       const errMsg = err instanceof Error ? err.message : String(err)
       console.warn("Primary model error, attempting fallback:", errMsg)
       responseStream = await ai.models.generateContentStream({
-        model: "gemini-3.8-flash",
+        model: "gemini-2.5-flash-lite",
         contents,
         config: {
           systemInstruction,
@@ -594,4 +730,3 @@ ${matchedClientPrompt}
     )
   }
 }
-
