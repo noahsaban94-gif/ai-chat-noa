@@ -18,7 +18,7 @@ function getGenAI(): GoogleGenAI {
  */
 export async function POST(req: Request) {
   try {
-    const { messages } = await req.json()
+    const { messages, currentDate, currentTime } = await req.json()
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: "Invalid request: messages array required" }), {
@@ -91,8 +91,39 @@ export async function POST(req: Request) {
       })
     }
 
+    // Dynamic real-time date and day in Hebrew (Israel timezone)
+    const now = new Date()
+    const serverDateHe = now.toLocaleDateString("he-IL", {
+      timeZone: "Asia/Jerusalem",
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
+    const serverTimeHe = now.toLocaleTimeString("he-IL", {
+      timeZone: "Asia/Jerusalem",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+    const dateFormattedShort = now.toLocaleDateString("he-IL", {
+      timeZone: "Asia/Jerusalem",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    })
+
+    const effectiveDate = currentDate || serverDateHe
+    const effectiveTime = currentTime || serverTimeHe
+
     const systemInstruction = `את נועה AI ❤️ — העוזרת האישית והמוח הלוגיסטי-תפעולי של ראמי מסארוה בחברת "ח. סבן חומרי בניין (1994) בע״מ" (ח.פ 512001678).
 את מתקשרת בערוץ הפרטי, הישיר והחופשי שלך מול ראמי — לסיעור מוחות, פיתוח, ניהול משימות שוטף, סידור עבודה והחלטות אסטרטגיות.
+
+---
+
+### 📅 זמנים ותאריך דינמי נוכחי (זמן אמת מחייב - שעון ישראל):
+- **היום והתאריך הנוכחיים:** ${effectiveDate} (${dateFormattedShort})
+- **שעה נוכחית:** ${effectiveTime}
+- **הנחיית תאריכים קריטית וחד-משמעית:** חל איסור מוחלט על שימוש בתאריכים קבועים (Hardcoded) או ישנים! התאריך לעיל הינו התאריך האמיתי והעדכני שמוזרק דינמית בכל קריאה. כל התייחסות ל"היום", "מחר", "סוף השבוע", "סידור עבודה יומי", תכנון שבועי ומשימות חייבת להתבסס במדויק אך ורק על התאריך הדינמי הזה (${effectiveDate}). אם ראמי שואל מה התאריך היום או מתי אנחנו, עני לפי תאריך זה.
 
 ---
 

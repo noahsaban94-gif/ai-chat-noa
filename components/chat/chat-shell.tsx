@@ -102,6 +102,18 @@ export function ChatShell() {
       setAbortController(controller)
 
       try {
+        const now = new Date()
+        const clientDate = now.toLocaleDateString("he-IL", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })
+        const clientTime = now.toLocaleTimeString("he-IL", {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: {
@@ -114,6 +126,8 @@ export function ChatShell() {
               imageData: m.imageData,
             })),
             model: selectedModel,
+            currentDate: `יום ${clientDate}`,
+            currentTime: clientTime,
           }),
           signal: controller.signal,
         })

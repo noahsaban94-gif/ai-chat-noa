@@ -48,9 +48,8 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
   const isRecordingRef = useRef(false)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
-  const hasTranscribedViaSpeechRef = useRef(false)
+  const speechRecognitionTextRef = useRef("")
   const baseTextRef = useRef("")
-  const finalTranscriptsRef = useRef("")
 
   const handleInput = useCallback(() => {
     const textarea = textareaRef.current
@@ -87,10 +86,14 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
 
         const fullSpeech = (newFinalText + interimText).trim()
         if (fullSpeech) {
-          hasTranscribedViaSpeechRef.current = true
+          speechRecognitionTextRef.current = fullSpeech
           const prefix = baseTextRef.current ? baseTextRef.current.trim() + " " : ""
-          setValue(prefix + fullSpeech)
-          handleInput()
+          const combined = prefix + fullSpeech
+          setValue(combined)
+          if (textareaRef.current) {
+            textareaRef.current.value = combined
+            handleInput()
+          }
         }
       }
 
@@ -98,8 +101,10 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
         console.warn("Speech recognition notice:", event.error)
         if (event.error === "no-speech") return
         if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-          setIsRecording(false)
-          isRecordingRef.current = false
+          // Do not crash - media recorder fallback will take over seamlessly
+          try {
+            recognition.stop()
+          } catch {}
         }
       }
 
@@ -159,22 +164,29 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
       } catch {}
     }
 
-    if (mediaStream) {
-      mediaStream.getTracks().forEach((track) => track.stop())
-      setMediaStream(null)
-    }
-
     const recorder = mediaRecorderRef.current
     if (recorder && recorder.state !== "inactive") {
+      try {
+        recorder.requestData()
+      } catch {}
+
       recorder.onstop = async () => {
-        // If Web Speech already captured text, we don't need backup transcription
-        if (hasTranscribedViaSpeechRef.current) return
+        // Stop audio tracks after recorder finished
+        if (mediaStream) {
+          mediaStream.getTracks().forEach((track) => track.stop())
+          setMediaStream(null)
+        }
+
+        // If Web Speech already captured text, keep it!
+        if (speechRecognitionTextRef.current.trim().length > 0) {
+          return
+        }
 
         const audioBlob = new Blob(audioChunksRef.current, {
           type: recorder.mimeType || "audio/webm",
         })
 
-        if (audioBlob.size > 2000) {
+        if (audioBlob.size > 200) {
           setIsTranscribing(true)
           try {
             const formData = new FormData()
@@ -187,10 +199,15 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
 
             if (res.ok) {
               const data = await res.json()
-              if (data.text) {
+              if (data.text && data.text.trim()) {
                 const prefix = baseTextRef.current ? baseTextRef.current.trim() + " " : ""
-                setValue(prefix + data.text)
-                handleInput()
+                const fullText = prefix + data.text.trim()
+                setValue(fullText)
+                if (textareaRef.current) {
+                  textareaRef.current.value = fullText
+                  textareaRef.current.focus()
+                  handleInput()
+                }
               }
             }
           } catch (err) {
@@ -200,7 +217,17 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
           }
         }
       }
-      recorder.stop()
+
+      try {
+        recorder.stop()
+      } catch (err) {
+        console.warn("Error stopping recorder:", err)
+      }
+    } else {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach((track) => track.stop())
+        setMediaStream(null)
+      }
     }
   }, [mediaStream, handleInput])
 
@@ -212,8 +239,7 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
     } else {
       playRecordSound()
       baseTextRef.current = value
-      finalTranscriptsRef.current = ""
-      hasTranscribedViaSpeechRef.current = false
+      speechRecognitionTextRef.current = ""
       audioChunksRef.current = []
 
       try {
@@ -224,18 +250,23 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
 
         // Setup MediaRecorder for universal AI transcription fallback
         try {
-          const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-            ? "audio/webm;codecs=opus"
-            : MediaRecorder.isTypeSupported("audio/mp4")
-              ? "audio/mp4"
-              : ""
+          let mimeType = ""
+          if (typeof MediaRecorder !== "undefined") {
+            if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+              mimeType = "audio/webm;codecs=opus"
+            } else if (MediaRecorder.isTypeSupported("audio/webm")) {
+              mimeType = "audio/webm"
+            } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+              mimeType = "audio/mp4"
+            }
+          }
           const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
           recorder.ondataavailable = (e) => {
             if (e.data && e.data.size > 0) {
               audioChunksRef.current.push(e.data)
             }
           }
-          recorder.start(250)
+          recorder.start(100)
           mediaRecorderRef.current = recorder
         } catch (e) {
           console.warn("MediaRecorder start notice:", e)
@@ -273,7 +304,7 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
     setValue("")
     setUploadedImage(null)
     baseTextRef.current = ""
-    finalTranscriptsRef.current = ""
+    speechRecognitionTextRef.current = ""
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto"
     }
