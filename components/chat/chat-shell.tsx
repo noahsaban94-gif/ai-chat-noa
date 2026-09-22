@@ -1,13 +1,21 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { RotateCcw, Trash2 } from "lucide-react"
+import { useState, useEffect, useCallback, useRef } from "react"
+import { RotateCcw, Trash2, Sparkles, Database } from "lucide-react"
 import { MessageList } from "./message-list"
 import { Composer, type AIModel } from "./composer"
 import { Button } from "@/components/ui/button"
 import { VideoBackground } from "./video-background"
 import { PWAInstallButton } from "@/components/pwa/pwa-install-button"
 import { OfflineIndicator } from "@/components/pwa/offline-indicator"
+import {
+  listenToConversation,
+  saveMessage,
+  detectDevice,
+  ACTIVE_SESSION_ID,
+  messageDocumentToUIMessage,
+} from "@/lib/conversation-memory"
+import { seedFirestoreConversations } from "@/lib/seed-conversations"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +34,8 @@ export interface Message {
   content: string
   createdAt: Date
   imageData?: string
+  device?: "pc" | "samsung_mobile" | "whatsapp"
+  isNormalizedOrder?: boolean
 }
 
 // localStorage key for persisting messages
@@ -40,17 +50,55 @@ function generateId(): string {
 export function ChatShell() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
+  const isStreamingRef = useRef(isStreaming)
+  useEffect(() => {
+    isStreamingRef.current = isStreaming
+  }, [isStreaming])
+
+  const [isFirestoreConnected, setIsFirestoreConnected] = useState(false)
+  const [isSeeding, setIsSeeding] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [abortController, setAbortController] = useState<AbortController | null>(null)
   const [selectedModel, setSelectedModel] = useState<AIModel>("google/gemini-2.0-flash-001")
   const [isLoaded, setIsLoaded] = useState(false)
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false)
 
-  // Load messages from localStorage on mount
+  // Listen to Cloud Firestore in real time for cross-device memory (PC + Samsung)
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined
+    try {
+      unsubscribe = listenToConversation(ACTIVE_SESSION_ID, (firestoreDocs) => {
+        if (firestoreDocs && firestoreDocs.length > 0) {
+          setIsFirestoreConnected(true)
+          if (!isStreamingRef.current) {
+            const uiMsgs: Message[] = firestoreDocs.map((doc) => messageDocumentToUIMessage(doc))
+            setMessages(uiMsgs)
+          }
+        } else {
+          // If Firestore is empty, auto-inject the initial conversation context
+          seedFirestoreConversations(false)
+            .then((res) => {
+              if (res.success) {
+                setIsFirestoreConnected(true)
+              }
+            })
+            .catch((err) => console.warn("Auto-seed error:", err))
+        }
+      })
+    } catch (e) {
+      console.warn("Firestore listener not connected, falling back to local storage:", e)
+    }
+
+    return () => {
+      if (unsubscribe) unsubscribe()
+    }
+  }, [])
+
+  // Load messages from localStorage on mount as backup
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
+      if (stored && messages.length === 0) {
         const parsed = JSON.parse(stored)
         const messagesWithDates = parsed.map((msg: Message) => ({
           ...msg,
@@ -67,7 +115,7 @@ export function ChatShell() {
     } finally {
       setIsLoaded(true)
     }
-  }, [])
+  }, [messages.length])
 
   // Persist messages to localStorage whenever they change
   useEffect(() => {
@@ -81,6 +129,20 @@ export function ChatShell() {
   const handleModelChange = useCallback((model: AIModel) => {
     setSelectedModel(model)
     localStorage.setItem(MODEL_STORAGE_KEY, model)
+  }, [])
+
+  const handleSeedConversation = useCallback(async () => {
+    setIsSeeding(true)
+    try {
+      const res = await seedFirestoreConversations(true)
+      if (res.success) {
+        setIsFirestoreConnected(true)
+      }
+    } catch (err) {
+      console.error("Failed to seed conversation in Firestore:", err)
+    } finally {
+      setIsSeeding(false)
+    }
   }, [])
 
   // Send a message to the AI
@@ -108,6 +170,11 @@ export function ChatShell() {
       const newMessages = [...messages, userMessage, assistantMessage]
       setMessages(newMessages)
       setIsStreaming(true)
+
+      // שמירת הודעת המשתמש ב-Cloud Firestore
+      saveMessage(ACTIVE_SESSION_ID, "user", userMessage.content, detectDevice()).catch((err) =>
+        console.warn("Could not save user message to Firestore:", err)
+      )
 
       const controller = new AbortController()
       setAbortController(controller)
@@ -166,6 +233,13 @@ export function ChatShell() {
 
           setMessages((prev) =>
             prev.map((msg) => (msg.id === assistantMessage.id ? { ...msg, content: accumulatedContent } : msg)),
+          )
+        }
+
+        // שמירת תשובת נועה ב-Cloud Firestore לסנכרון מלא
+        if (accumulatedContent.trim()) {
+          saveMessage(ACTIVE_SESSION_ID, "model", accumulatedContent, "pc").catch((err) =>
+            console.warn("Could not save assistant message to Firestore:", err)
           )
         }
       } catch (e) {
@@ -262,9 +336,35 @@ export function ChatShell() {
           <span className="text-xs font-medium text-stone-600 hidden md:inline truncate">ח. סבן חומרי בניין (1994) בע״מ</span>
           <span className="text-stone-300 text-xs hidden sm:inline">|</span>
           <span className="text-xs font-semibold text-emerald-800 truncate">ראמי מסארוה</span>
+
+          {isFirestoreConnected && (
+            <span
+              id="firestore-status-badge"
+              className="hidden lg:inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[10px] font-medium px-2 py-0.5 rounded-full border border-emerald-200/80"
+              title="מסונכרן בזמן אמת ל-Cloud Firestore (מחשב וסמסונג נייד)"
+            >
+              <Database className="w-2.5 h-2.5 text-emerald-600" />
+              <span>ענן מסונכרן</span>
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto shrink-0">
+          <Button
+            id="seed-firestore-button"
+            onClick={handleSeedConversation}
+            disabled={isSeeding}
+            variant="outline"
+            size="sm"
+            className="h-8 sm:h-9 px-2.5 sm:px-3 rounded-full bg-amber-50/90 hover:bg-amber-100/90 text-amber-900 border border-amber-200/80 shadow-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer font-medium text-xs backdrop-blur-md"
+            aria-label="הזרק נתוני שיחה ורענן הקשר ב-Cloud Firestore"
+            title="הזרקת נתוני שיחה מלאים ל-Cloud Firestore שנועה תזכור את כל ההקשר התפעולי"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+            <span className="font-semibold text-xs hidden sm:inline">{isSeeding ? "מזריק..." : "הזרק הקשר"}</span>
+            <span className="font-semibold text-xs sm:hidden">הזרק</span>
+          </Button>
+
           <PWAInstallButton />
           <Button
             id="clear-history-button"

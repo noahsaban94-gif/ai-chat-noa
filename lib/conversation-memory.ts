@@ -250,3 +250,36 @@ export function listenToConversation(
     }
   )
 }
+
+export const ACTIVE_SESSION_ID = "user_0508860896_active"
+
+/**
+ * המרת מסמך הודעה מ-Firestore לאובייקט Message של ממשק המשתמש
+ */
+export function messageDocumentToUIMessage(doc: MessageDocument): {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  createdAt: Date
+  device?: DeviceType
+  isNormalizedOrder?: boolean
+} {
+  let createdDate = new Date()
+  if (doc.timestamp) {
+    if (typeof (doc.timestamp as { toDate?: () => Date }).toDate === "function") {
+      createdDate = (doc.timestamp as { toDate: () => Date }).toDate()
+    } else if (doc.timestamp instanceof Date) {
+      createdDate = doc.timestamp
+    }
+  }
+
+  return {
+    id: doc.id || `msg_${Math.random().toString(36).substring(2, 9)}`,
+    role: doc.role === "model" ? "assistant" : "user",
+    content: doc.text,
+    createdAt: createdDate,
+    device: doc.device,
+    isNormalizedOrder: doc.isNormalizedOrder,
+  }
+}
+

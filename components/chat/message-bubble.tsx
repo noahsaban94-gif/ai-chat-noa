@@ -117,6 +117,18 @@ export function MessageBubble({ message, isStreaming = false, onActionClick }: M
               <span>{timeFormatted}</span>
             </time>
           )}
+          {message.device && (
+            <>
+              <span className="text-stone-300 text-[10px]">•</span>
+              <span className="text-[10px] font-medium text-stone-500 bg-stone-100/90 border border-stone-200/60 px-1.5 py-0.2 rounded-md">
+                {message.device === "samsung_mobile"
+                  ? "📱 סמסונג"
+                  : message.device === "whatsapp"
+                  ? "💬 וואטסאפ"
+                  : "💻 מחשב"}
+              </span>
+            </>
+          )}
         </div>
 
         {/* Bubble */}
