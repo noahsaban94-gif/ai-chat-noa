@@ -6,6 +6,8 @@ import { MessageList } from "./message-list"
 import { Composer, type AIModel } from "./composer"
 import { Button } from "@/components/ui/button"
 import { VideoBackground } from "./video-background"
+import { PWAInstallButton } from "@/components/pwa/pwa-install-button"
+import { OfflineIndicator } from "@/components/pwa/offline-indicator"
 
 // Data model for messages
 export interface Message {
@@ -223,6 +225,7 @@ export function ChatShell() {
         </div>
 
         <div className="flex items-center gap-2 pointer-events-auto">
+          <PWAInstallButton />
           <Button
             onClick={clearChat}
             variant="ghost"
@@ -255,6 +258,8 @@ export function ChatShell() {
         selectedModel={selectedModel}
         onModelChange={handleModelChange}
       />
+
+      <OfflineIndicator />
     </div>
   )
 }
