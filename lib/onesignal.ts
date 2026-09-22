@@ -27,7 +27,7 @@ export interface OneSignalPushResult {
 
 export async function sendOneSignalPush(params: OneSignalPushParams): Promise<OneSignalPushResult> {
   const appId = params.appId || process.env.ONESIGNAL_APP_ID || "8f9c9417-530c-41e2-8a65-850d10758258"
-  const rawApiKey = params.apiKey || process.env.ONESIGNAL_REST_API_KEY || "snqjezzr7er64dnhhyof3pzoe"
+  const rawApiKey = params.apiKey || process.env.ONESIGNAL_REST_API_KEY || "os_v2_app_r6ojif2tbra6fctfqugra5mcld3qwaxp2lgevdvazqtnecdbnlkd5ooualhui4dlke7nv6lvug4qhquicjd2e3jmkkpsk72lv3wz5cy"
 
   if (!rawApiKey) {
     return {
@@ -70,7 +70,9 @@ export async function sendOneSignalPush(params: OneSignalPushParams): Promise<On
     params.signature ||
     `🏷️ חותמת מענה רשמית: נועה AI ❤️ | מוח תפעולי ולוגיסטי - ח. סבן חומרי בניין (1994) בע״מ | ${timeFormatted} (${dateFormatted})`
 
-  const fullContent = `${params.message}\n\n${signature}`
+  const cleanMessage =
+    params.message.length > 1800 ? `${params.message.slice(0, 1797)}...` : params.message
+  const fullContent = `${cleanMessage}\n\n${signature}`
   const title = params.title || "נועה AI ❤️ | ח. סבן חומרי בניין"
   const targetUrl =
     params.url || "https://ais-pre-x6v6mobnnowcdewbppidqv-812919982163.europe-west2.run.app"
