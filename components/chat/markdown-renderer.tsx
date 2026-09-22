@@ -6,6 +6,8 @@ import { useState, useEffect } from "react"
 import { AnalysisWordSpan } from "./analysis-word-span"
 import { Sparkles } from "lucide-react"
 import parse, { HTMLReactParserOptions, Element, DOMNode, domToReact } from "html-react-parser"
+import { YouTubeEmbed } from "./youtube-embed"
+import { extractYouTubeVideoId, TRAINING_PRODUCTS } from "@/lib/training-videos"
 
 interface MarkdownRendererProps {
   content: string
@@ -400,6 +402,73 @@ export function MarkdownRenderer({
     )
   }
 
+  // Parse text and render embedded YouTube videos seamlessly when links are present
+  const renderTextWithYouTubeVideos = (text: string, partIndex: number, animated: boolean) => {
+    // Matches markdown YouTube links: [title](url) or standalone YouTube URLs
+    const ytRegex = /(?:\[([^\]]+)\]\((https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}[^)]*)\)|(https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}(?:[^\s\n()<>]*)))/g
+
+    if (!ytRegex.test(text)) {
+      return animated ? renderAnimatedInlineMarkdown(text) : renderPlainInlineMarkdown(text)
+    }
+
+    ytRegex.lastIndex = 0
+
+    const chunks: React.ReactNode[] = []
+    let lastIndex = 0
+    let match: RegExpExecArray | null
+
+    while ((match = ytRegex.exec(text)) !== null) {
+      const matchIndex = match.index
+      const fullMatch = match[0]
+      const linkTitle = match[1]
+      const rawUrl = match[2] || match[3] || fullMatch
+
+      if (matchIndex > lastIndex) {
+        const textBefore = text.slice(lastIndex, matchIndex)
+        chunks.push(
+          <span key={`txt-${partIndex}-${lastIndex}`}>
+            {animated ? renderAnimatedInlineMarkdown(textBefore) : renderPlainInlineMarkdown(textBefore)}
+          </span>,
+        )
+      }
+
+      const videoId = extractYouTubeVideoId(rawUrl)
+      if (videoId) {
+        const matchedProduct = TRAINING_PRODUCTS.find((p) => p.videoId === videoId)
+        const displayTitle = linkTitle || matchedProduct?.videoTitle || matchedProduct?.name || "סרטון הדרכה מקצועי | ח. סבן חומרי בניין"
+
+        chunks.push(
+          <div key={`yt-${partIndex}-${matchIndex}`} className="w-full my-2.5">
+            <YouTubeEmbed
+              videoId={videoId}
+              url={rawUrl}
+              title={displayTitle}
+            />
+          </div>,
+        )
+      } else {
+        chunks.push(
+          <span key={`fallback-${partIndex}-${matchIndex}`}>
+            {animated ? renderAnimatedInlineMarkdown(fullMatch) : renderPlainInlineMarkdown(fullMatch)}
+          </span>,
+        )
+      }
+
+      lastIndex = matchIndex + fullMatch.length
+    }
+
+    if (lastIndex < text.length) {
+      const textAfter = text.slice(lastIndex)
+      chunks.push(
+        <span key={`txt-rem-${partIndex}-${lastIndex}`}>
+          {animated ? renderAnimatedInlineMarkdown(textAfter) : renderPlainInlineMarkdown(textAfter)}
+        </span>,
+      )
+    }
+
+    return chunks
+  }
+
   const renderContent = (text: string, animated: boolean) => {
     if (!text) return null
 
@@ -437,18 +506,19 @@ export function MarkdownRenderer({
           if (sub.trim().startsWith("|") && sub.includes("\n|")) {
             return renderMarkdownTable(sub, sIdx)
           }
-          if (animated) {
-            return <span key={sIdx}>{renderAnimatedInlineMarkdown(sub)}</span>
-          }
-          return <span key={sIdx}>{renderPlainInlineMarkdown(sub)}</span>
+          return (
+            <span key={sIdx}>
+              {renderTextWithYouTubeVideos(sub, sIdx, animated)}
+            </span>
+          )
         })
       }
 
-      if (animated) {
-        return <span key={partIndex}>{renderAnimatedInlineMarkdown(part)}</span>
-      }
-
-      return <span key={partIndex}>{renderPlainInlineMarkdown(part)}</span>
+      return (
+        <span key={partIndex}>
+          {renderTextWithYouTubeVideos(part, partIndex, animated)}
+        </span>
+      )
     })
   }
 

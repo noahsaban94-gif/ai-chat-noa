@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai"
 import { HISTORICAL_63_CLIENTS, findBestClientMatch, searchClients } from "@/lib/historical-clients"
+import { TRAINING_PRODUCTS, findTrainingVideos } from "@/lib/training-videos"
 import { db } from "@/lib/firebase-auth"
 import { doc, getDoc, updateDoc, collection, addDoc, serverTimestamp, arrayUnion } from "firebase/firestore"
 import type { AuthorizedUser } from "@/lib/types/device-auth"
@@ -289,6 +290,84 @@ ${matchingClients.map(c => `- לקוח קומקס ${c.comaxId}: ${c.name} (${c.a
 `
     }
 
+    // Handle OneSignal push requests directly if requested
+    let oneSignalStatusNote = ""
+    if (/onesignal|דחיפת התראה|התראה למערכת/i.test(latestUserMessage)) {
+      const appId = process.env.ONESIGNAL_APP_ID || "8f9c9417-530c-41e2-8a65-850d10758258"
+      const apiKey = process.env.ONESIGNAL_REST_API_KEY
+      if (apiKey) {
+        try {
+          const pushRes = await fetch("https://onesignal.com/api/v1/notifications", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json; charset=utf-8",
+              Authorization: `Basic ${apiKey}`,
+            },
+            body: JSON.stringify({
+              app_id: appId,
+              included_segments: ["Subscribed Users", "Total Subscriptions"],
+              headings: { he: "נועה AI ❤️ | ח. סבן חומרי בניין", en: "Noa AI | H. Saban" },
+              contents: {
+                he: `הודעה מבצעית מנועה AI:\n${latestUserMessage}\n\n🏷️ חותמת מענה רשמית: נועה AI ❤️ (ח. סבן) | ${effectiveTime} (${effectiveDate})`,
+                en: `Operational alert from Noa AI.\n\n🏷️ Official Stamp: Noa AI (H. Saban) | ${effectiveTime} (${effectiveDate})`,
+              },
+              data: { sender: "noa_ai", stamp: true, israelTime: effectiveTime },
+            }),
+          })
+          const pushData = await pushRes.json().catch(() => null)
+          if (pushRes.ok) {
+            oneSignalStatusNote = `\n\n### 🔔 סטטוס דחיפת התראה ל-OneSignal:
+- ההתראה נדחפה בהצלחה למערכת OneSignal עם חותמת מענה רשמית מנועה!
+- מזהה התראה (Notification ID): ${pushData?.id || "מאושר"}
+- נמענים רשומים: ${pushData?.recipients || 0}
+- צייני לראמי בביטחון ובחום שההתראה נדחפה בהצלחה למערכת עם חותמת רשמית וזמן מדויק.`
+          } else {
+            oneSignalStatusNote = `\n\n### 🔔 סטטוס דחיפת התראה ל-OneSignal:
+- שגיאה מול שרתי OneSignal: ${JSON.stringify(pushData?.errors || pushData)}
+- צייני לראמי את הפרטים.`
+          }
+        } catch (e: unknown) {
+          const errMsg = e instanceof Error ? e.message : String(e)
+          oneSignalStatusNote = `\n\n### 🔔 סטטוס דחיפת התראה ל-OneSignal:
+- כשל תקשורת מול OneSignal: ${errMsg}`
+        }
+      } else {
+        oneSignalStatusNote = `\n\n### 🔔 סטטוס מערכת OneSignal:
+- מזהה האפליקציה ב-OneSignal מקושר: 8f9c9417-530c-41e2-8a65-850d10758258.
+- ערוץ הדחיפה של נועה (/api/onesignal/notify) פעיל וכפתור "התראת OneSignal" נוסף בכל הודעה של נועה.
+- נדרש רק להגדיר את מפתח ה-API הסודי ONESIGNAL_REST_API_KEY בהגדרות (Settings) של האפליקציה לצורך שליחה ישירה לכל המכשירים הרשומים.
+- הסבירי לראמי שהתשתית מוכנה לחלוטין וניתן לדחוף כל מענה בלחיצה אחת על כפתור "התראת OneSignal".`
+      }
+    }
+
+    // Training Videos and Technical Demonstrations
+    const matchedTrainingVideos = findTrainingVideos(latestUserMessage)
+    const isVideoOrTechnical = /סרטון|וידאו|הדרכה|יוטיוב|youtube|video|מדריך|איך ליישם|איך להרכיב|איך לפרוק|איטום|גבס|מנוף|דבק|סיקה/i.test(latestUserMessage)
+
+    const trainingVideosPrompt = `
+### 🎥 הצגת סרטוני וידאו והדרכות מקצועיות:
+כאשר המשתמש מבקש סרטון, או כאשר מדובר בהדרכה טכנית (למשל: יישום איטום סיקה, הרכבת מחיצות גבס, בטיחות מנוף, דבק קרמיקה, טיח תרמי, ברזל ורשתות):
+- צרפי את קישור היוטיוב המלא בשורה נפרדת:
+https://www.youtube.com/watch?v=[VIDEO_ID]
+- הממשק יזהה את הקישור אוטומטית ויציג אותו כנגן וידאו מובנה בתוך השיחה.
+- לעולם אל תצרפי את הקישור בתוך משפט; מקמי אותו בשורה נפרדת עם שורות ריקות מעליו ומתחתיו.
+
+מאגר סרטוני מוצרים לדוגמה לשליפה לפי מילות מפתח:
+${TRAINING_PRODUCTS.map((p) => `- מוצר: **${p.name}** (מק"ט: ${p.sku}) | מילות מפתח: [${p.keywords.slice(0, 6).join(", ")}]
+  קישור יוטיוב רשמי: ${p.youtubeUrl}
+  שלבים מרכזיים: ${p.keyTechnicalSteps.slice(0, 2).join("; ")}`).join("\n")}
+${
+  matchedTrainingVideos.length > 0
+    ? `\n### 💡 סרטון הדרכה שנמצא בהתאמה ישירה להודעה:
+${matchedTrainingVideos.slice(0, 2).map((v) => `* **${v.name}**
+  קישור להטמעה בשורה נפרדת:
+  ${v.youtubeUrl}
+  דגשים טכניים: ${v.keyTechnicalSteps.join(" | ")}
+  בטיחות: ${(v.safetyNotes || []).join(" | ")}`).join("\n")}`
+    : ""
+}
+`
+
     const verifiedIdentityBanner = verifiedUser ? `
 ### 🔒 זהות משתמש מאומתת (Device Binding מאושר ומאומטח בחומרה):
 - **הודעה מאומתת מאת:** ${verifiedUser.name}
@@ -314,6 +393,8 @@ ${matchingClients.map(c => `- לקוח קומקס ${c.comaxId}: ${c.name} (${c.a
 את מתקשרת בערוץ הפרטי, הישיר והחופשי שלך מול ראמי וצוות ההנהלה והתפעול — לסיעור מוחות, פיתוח, ניהול משימות שוטף, סידור עבודה והחלטות אסטרטגיות.
 
 ${verifiedIdentityBanner}
+${oneSignalStatusNote}
+${trainingVideosPrompt}
 
 ---
 

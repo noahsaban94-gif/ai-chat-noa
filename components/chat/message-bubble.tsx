@@ -1,10 +1,13 @@
 "use client"
 
+import { useState } from "react"
 import { cn } from "@/lib/utils"
 import type { Message } from "./chat-shell"
-import { Clock, Volume2, VolumeX, Loader2 } from "lucide-react"
+import { Clock, Volume2, VolumeX, Loader2, Bell, Check } from "lucide-react"
 import { MarkdownRenderer } from "./markdown-renderer"
 import Image from "next/image"
+import { pushToOneSignal } from "@/lib/onesignal"
+import { toast } from "sonner"
 
 interface MessageBubbleProps {
   message: Message
@@ -57,6 +60,32 @@ export function MessageBubble({
   const isUser = message.role === "user"
   const timeFormatted = formatTime(message.createdAt)
   const fullDateTime = formatFullDateTime(message.createdAt)
+
+  const [isPushingOneSignal, setIsPushingOneSignal] = useState(false)
+  const [pushSuccess, setPushSuccess] = useState(false)
+
+  const handlePushToOneSignal = async () => {
+    if (isPushingOneSignal || !message.content) return
+    setIsPushingOneSignal(true)
+    try {
+      const res = await pushToOneSignal({
+        title: "נועה AI ❤️ | ח. סבן חומרי בניין",
+        message: message.content,
+      })
+      if (res.success) {
+        setPushSuccess(true)
+        toast.success("ההתראה נדחפה בהצלחה ל-OneSignal עם חותמת רשמית מנועה!")
+        setTimeout(() => setPushSuccess(false), 4000)
+      } else {
+        toast.error(res.error || "לא ניתן היה לדחוף את ההתראה ל-OneSignal")
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      toast.error(msg || "שגיאה בדחיפת ההתראה")
+    } finally {
+      setIsPushingOneSignal(false)
+    }
+  }
 
   return (
     <div
@@ -316,6 +345,43 @@ export function MessageBubble({
                 <>
                   <Volume2 className="w-3 h-3 text-stone-500 hover:text-stone-800" />
                   <span>השמעה</span>
+                </>
+              )}
+            </button>
+          )}
+
+          {/* OneSignal Push Notification Button with Noa's official stamp */}
+          {!isUser && !isStreaming && message.content && (
+            <button
+              type="button"
+              id={`onesignal-push-btn-${message.id}`}
+              onClick={handlePushToOneSignal}
+              disabled={isPushingOneSignal}
+              className={cn(
+                "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-all cursor-pointer active:scale-95",
+                pushSuccess
+                  ? "bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs font-semibold"
+                  : isPushingOneSignal
+                  ? "bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs animate-pulse"
+                  : "bg-stone-100 hover:bg-stone-200/80 text-stone-600 hover:text-stone-900 border border-stone-200/60 shadow-2xs",
+              )}
+              title="דחיפת התראה למערכת OneSignal עם חותמת מענה רשמית מנועה"
+              aria-label="דחיפת התראה ל-OneSignal עם חותמת נועה"
+            >
+              {isPushingOneSignal ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin text-amber-600" />
+                  <span>דוחף...</span>
+                </>
+              ) : pushSuccess ? (
+                <>
+                  <Check className="w-3 h-3 text-emerald-600" />
+                  <span>נשלח ל-OneSignal!</span>
+                </>
+              ) : (
+                <>
+                  <Bell className="w-3 h-3 text-stone-500 hover:text-stone-800" />
+                  <span>התראת OneSignal</span>
                 </>
               )}
             </button>
