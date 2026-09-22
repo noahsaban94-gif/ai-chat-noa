@@ -198,10 +198,10 @@ export function MessageList({ messages, isStreaming, error, onRetry, isLoaded, o
           {/* Quick starter chips */}
           <div className="flex flex-wrap items-center justify-center gap-2 mt-6 max-w-lg">
             {[
-              { icon: "📋", text: "סידור עבודה יומי לנהגים ולמשאיות" },
-              { icon: "🏗️", text: "בדיקת סטטוס מלאי חומרי בניין והזמנות רכש" },
-              { icon: "💡", text: "סיעור מוחות לפיתוח וייעול לוגיסטי" },
-              { icon: "⏱️", text: "מעקב אספקות וסגירת קצוות פתוחים" },
+              { icon: "📦", text: "היי ראמי תביא לי דחוף לחורש 21 כפר שמריהו 3 בלות חול ומשטח מלט, תרים מעבר לגדר" },
+              { icon: "📋", text: "סידור עבודה יומי לנהגים (חכמת מנוף ועלי חלוקה)" },
+              { icon: "🏗️", text: "בדיקת סטטוס מלאי חצר ובלות אצל אורן" },
+              { icon: "💰", text: "בירור מחיר והנחה על בלוקים (הפניה לאיציק זהבי)" },
             ].map((item, idx) => (
               <button
                 key={idx}
