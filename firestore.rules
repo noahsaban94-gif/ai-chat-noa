@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // קולקציית שיחות ראשית (conversations)
+    match /conversations/{sessionId} {
+      // קריאה מותרת לסנכרון רב-מכשירי (PC + Samsung Mobile)
+      allow read: if true;
+
+      // יצירה ועדכון שדות השיחה
+      allow create, update: if (
+        request.resource.data.userId is string &&
+        request.resource.data.activeDevice in ['pc', 'samsung_mobile', 'whatsapp']
+      );
+
+      // מחיקה חסומה לשמירה על רצף תפעולי
+      allow delete: if false;
+
+      // תת-קולקציית הודעות (messages)
+      match /messages/{messageId} {
+        // קריאה בזמן אמת לשיחה
+        allow read: if true;
+
+        // אימות תקינות של מסמך הודעה חדשה
+        allow create: if (
+          request.resource.data.role in ['user', 'model'] &&
+          request.resource.data.text is string &&
+          request.resource.data.device in ['pc', 'samsung_mobile', 'whatsapp'] &&
+          request.resource.data.isNormalizedOrder is bool
+        );
+
+        // חסימת עריכה או מחיקת הודעות קיימות (Audit Trail היסטורי מחייב)
+        allow update, delete: if false;
+      }
+    }
+  }
+}
