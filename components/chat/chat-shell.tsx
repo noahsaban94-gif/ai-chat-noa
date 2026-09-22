@@ -9,6 +9,7 @@ import { VideoBackground } from "./video-background"
 import { PWAInstallButton } from "@/components/pwa/pwa-install-button"
 import { OfflineIndicator } from "@/components/pwa/offline-indicator"
 import { DeviceAuthModal } from "./device-auth-modal"
+import { DevicePairingModal } from "./device-pairing-modal"
 import {
   getOrCreateDeviceId,
   getCurrentDeviceSession,
@@ -74,6 +75,13 @@ export function ChatShell() {
   const [currentSession, setCurrentSession] = useState<DeviceSession | null>(null)
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
   const [authBanner, setAuthBanner] = useState<{ message: string; type: "success" | "error" } | null>(null)
+  const [pairingModalData, setPairingModalData] = useState<{
+    isOpen: boolean
+    userId: string
+    userName: string
+    phone: string
+    pendingMessage?: { content: string; imageData?: string }
+  } | null>(null)
 
   // Initialize and verify device binding & check activation token in URL (?token=...)
   useEffect(() => {
@@ -260,15 +268,39 @@ export function ChatShell() {
         })
 
         if (!response.ok) {
-          let errorMsg = `שגיאת אימות / תקשורת (${response.status})`
+          let errData: {
+            error?: string
+            requiresPairing?: boolean
+            message?: string
+            userId?: string
+            userName?: string
+            phone?: string
+          } = {}
+
           try {
-            const errData = await response.json()
-            errorMsg = errData.error || errorMsg
+            errData = await response.json()
           } catch {
             const txt = await response.text()
-            if (txt) errorMsg = txt
+            errData = { message: txt }
           }
-          throw new Error(errorMsg)
+
+          // במידה ונדרש אימות מכשיר נוסף (OTP / Device Pairing)
+          if (errData.requiresPairing || errData.error === "UNAUTHORIZED_DEVICE") {
+            setMessages((prev) => prev.filter((msg) => msg.id !== assistantMessage.id))
+            setIsStreaming(false)
+            setAbortController(null)
+
+            setPairingModalData({
+              isOpen: true,
+              userId: errData.userId || targetUserId,
+              userName: errData.userName || currentSession?.name || "ראמי מסארוה",
+              phone: errData.phone || currentSession?.phone || "050-8860896",
+              pendingMessage: { content, imageData },
+            })
+            return
+          }
+
+          throw new Error(errData.message || errData.error || `שגיאת אימות / תקשורת (${response.status})`)
         }
 
         const reader = response.body?.getReader()
@@ -558,7 +590,43 @@ export function ChatShell() {
             type: "success",
           })
         }}
+        onRequestPairing={() => {
+          setIsAuthModalOpen(false)
+          setPairingModalData({
+            isOpen: true,
+            userId: currentSession?.userId || "user_rami_masarweh",
+            userName: currentSession?.name || "ראמי מסארוה",
+            phone: currentSession?.phone || "050-8860896",
+          })
+        }}
       />
+
+      {/* Device Pairing (OTP) Modal for additional devices (e.g. PC + Samsung) */}
+      {pairingModalData && (
+        <DevicePairingModal
+          isOpen={pairingModalData.isOpen}
+          onClose={() => setPairingModalData(null)}
+          userId={pairingModalData.userId}
+          userName={pairingModalData.userName}
+          phone={pairingModalData.phone}
+          onPairingSuccess={(newSession) => {
+            setCurrentSession(newSession)
+            setAuthBanner({
+              message: `מכשיר נוסף (${newSession.deviceModel}) אומת ואושר בהצלחה עבור ${newSession.name}!`,
+              type: "success",
+            })
+            const pending = pairingModalData.pendingMessage
+            setPairingModalData(null)
+
+            // המשך השיחה בצורה חלקה ללא צורך בהקלדה מחדש
+            if (pending) {
+              setTimeout(() => {
+                sendMessage(pending.content, pending.imageData)
+              }, 400)
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

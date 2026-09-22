@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai"
 import { HISTORICAL_63_CLIENTS, findBestClientMatch, searchClients } from "@/lib/historical-clients"
 import { db } from "@/lib/firebase-auth"
-import { doc, getDoc, updateDoc, collection, addDoc, serverTimestamp } from "firebase/firestore"
+import { doc, getDoc, updateDoc, collection, addDoc, serverTimestamp, arrayUnion } from "firebase/firestore"
 import type { AuthorizedUser } from "@/lib/types/device-auth"
 
 let aiClient: GoogleGenAI | null = null
@@ -46,13 +46,22 @@ export async function POST(req: Request) {
         if (userSnap.exists()) {
           const userData = userSnap.data() as AuthorizedUser
 
-          // בדיקה האם המכשיר כבר הופעל וננעל
-          if (!userData.isActivated || !userData.boundDeviceId) {
+          // איסוף כל מזהי המכשירים המאושרים (כולל boundDeviceId לתאימות לאחור)
+          const allowedDevices: string[] = Array.isArray(userData.allowedDeviceIds)
+            ? [...userData.allowedDeviceIds]
+            : []
+          if (userData.boundDeviceId && !allowedDevices.includes(userData.boundDeviceId)) {
+            allowedDevices.push(userData.boundDeviceId)
+          }
+
+          // בדיקה האם המשתמש כבר הופעל
+          if (!userData.isActivated || allowedDevices.length === 0) {
             // עבור ראמי בסביבת הפיתוח הראשונית - נעילת מכשיר אוטומטית אם טרם הופעל
             if (targetUserId === "user_rami_masarweh" && deviceId) {
               await updateDoc(userDocRef, {
                 boundDeviceId: deviceId,
                 boundDeviceModel: "מכשיר מנהל ראשי (Samsung/Workstation)",
+                allowedDeviceIds: arrayUnion(deviceId),
                 isActivated: true,
                 activationToken: null,
                 boundAt: serverTimestamp(),
@@ -69,7 +78,12 @@ export async function POST(req: Request) {
             } else {
               return new Response(
                 JSON.stringify({
-                  error: `חשבון זה (${userData.name}) טרם הופעל במכשיר פיזי. יש להיכנס באמצעות קישור ההפעלה האישי שנשלח אליך.`,
+                  error: "UNAUTHORIZED_DEVICE",
+                  requiresPairing: true,
+                  message: `חשבון זה (${userData.name}) טרם הופעל במכשיר פיזי. נדרש אימות מכשיר נוסף.`,
+                  userId: userData.userId,
+                  userName: userData.name,
+                  phone: userData.phone,
                 }),
                 {
                   status: 403,
@@ -78,23 +92,31 @@ export async function POST(req: Request) {
               )
             }
           } else {
-            // המשתמש מופעל - אימות קשיח שה-deviceId שנשלח תואם במדויק ל-boundDeviceId
-            if (deviceId && userData.boundDeviceId !== deviceId) {
-              // חוסר התאמה: מכשיר זר / ניסיון התחזות!
+            // בדיקה האם ה-deviceId הנוכחי כלול במערך allowedDeviceIds
+            const isDeviceAuthorized = Boolean(deviceId && allowedDevices.includes(deviceId))
+
+            if (!isDeviceAuthorized) {
+              // מכשיר לא מאושר - נדרש אימות OTP / צימוד מכשיר נוסף
               await addDoc(collection(db, "security_alerts"), {
                 userId: userData.userId,
                 userName: userData.name,
-                attemptedDeviceId: deviceId,
-                boundDeviceId: userData.boundDeviceId,
+                attemptedDeviceId: deviceId || "unknown",
+                boundDeviceId: userData.boundDeviceId || "",
+                allowedDeviceIds: allowedDevices,
                 ip: clientIp,
                 userAgent,
-                reason: `ניסיון גישה בלתי מורשית והתחזות ל-${userData.name} (${userData.role}) ממכשיר זר! המכשיר הנעול המורשה הוא: ${userData.boundDeviceModel || "Unknown Device"}`,
+                reason: `ניסיון גישה ממכשיר לא מאומת עבור ${userData.name} (${userData.role}). נדרש צימוד מכשיר נוסף ב-OTP.`,
                 timestamp: serverTimestamp(),
-              })
+              }).catch(() => {})
 
               return new Response(
                 JSON.stringify({
-                  error: `גישה נדחתה: מכשיר זה אינו מורשה עבור משתמש זה (${userData.name}). ניסיון ההתחזות נחסם ותועד ביומן האבטחה של ח. סבן.`,
+                  error: "UNAUTHORIZED_DEVICE",
+                  requiresPairing: true,
+                  message: "מכשיר לא מאומת. נדרש אימות מכשיר נוסף.",
+                  userId: userData.userId,
+                  userName: userData.name,
+                  phone: userData.phone,
                 }),
                 {
                   status: 403,
@@ -113,8 +135,8 @@ export async function POST(req: Request) {
               name: userData.name,
               role: userData.role,
               phone: userData.phone,
-              boundDeviceModel: userData.boundDeviceModel,
-              boundDeviceId: userData.boundDeviceId,
+              boundDeviceModel: userData.boundDeviceModel || "מכשיר מורשה ומאומת",
+              boundDeviceId: deviceId || userData.boundDeviceId || "",
             }
           }
         }

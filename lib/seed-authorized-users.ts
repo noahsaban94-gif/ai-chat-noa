@@ -130,6 +130,7 @@ export async function seedAuthorizedUsers(
       isActivated: false,
       boundDeviceId: null,
       boundDeviceModel: null,
+      allowedDeviceIds: [],
       boundAt: null,
       lastAccessAt: null,
       notes: teamMember.notes,

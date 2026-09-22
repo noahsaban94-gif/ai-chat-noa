@@ -8,6 +8,7 @@ import {
   updateDoc,
   addDoc,
   serverTimestamp,
+  arrayUnion,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase-auth"
 import type { AuthorizedUser } from "@/lib/types/device-auth"
@@ -97,6 +98,7 @@ export async function POST(req: Request) {
     await updateDoc(userRef, {
       boundDeviceId: deviceId,
       boundDeviceModel: deviceModel || "Unknown Device",
+      allowedDeviceIds: arrayUnion(deviceId),
       isActivated: true,
       activationToken: null, // ביטול הטוקן לצמיתות כדי שלא ניתן יהיה להעבירו לאחר!
       boundAt: serverTimestamp(),

@@ -19,6 +19,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // קולקציית בקשות אישור מכשירים נוספים וקודי OTP
+    // חסומה לחלוטין לקריאה וכתיבה ישירה מהלקוח - ניהול בלעדי ע"י Backend API
+    match /device_pairing_requests/{requestId} {
+      allow read, write: if false;
+    }
+
     // קולקציית שיחות ראשית (conversations)
     match /conversations/{sessionId} {
       // קריאה מותרת לסנכרון רב-מכשירי (PC + Samsung Mobile)

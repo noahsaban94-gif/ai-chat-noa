@@ -36,6 +36,7 @@ interface DeviceAuthModalProps {
   onClose: () => void
   currentSession: DeviceSession | null
   onSessionUpdated: (session: DeviceSession) => void
+  onRequestPairing?: () => void
 }
 
 export function DeviceAuthModal({
@@ -43,6 +44,7 @@ export function DeviceAuthModal({
   onClose,
   currentSession,
   onSessionUpdated,
+  onRequestPairing,
 }: DeviceAuthModalProps) {
   const [deviceId, setDeviceId] = useState("")
   const [deviceModel, setDeviceModel] = useState("")
@@ -195,10 +197,19 @@ export function DeviceAuthModal({
                 מזהה: {deviceId}
               </p>
             </div>
-            <div className="text-left sm:text-right shrink-0">
+            <div className="text-left sm:text-right shrink-0 flex flex-col items-end gap-1.5">
               <span className="text-[11px] font-semibold text-stone-600 bg-stone-200/60 px-2 py-0.5 rounded-md">
                 {currentSession ? `מקושר ל: ${currentSession.name}` : "טרם קושר משתמש"}
               </span>
+              {onRequestPairing && (
+                <button
+                  type="button"
+                  onClick={onRequestPairing}
+                  className="text-[11px] text-emerald-700 hover:text-emerald-800 font-semibold underline cursor-pointer"
+                >
+                  צימוד מכשיר זה ב-OTP (וואטסאפ)
+                </button>
+              )}
             </div>
           </div>
         </div>

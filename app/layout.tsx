@@ -74,18 +74,12 @@ export default function RootLayout({
   return (
     <html lang="he" dir="rtl">
       <head>
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="נועה AI" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         {/* OneSignal Web Push - safely initialized only on configured origin */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
                 try {
-                  // Suppress origin mismatch errors from OneSignal on preview or dev URLs
                   window.addEventListener("error", function(e) {
                     if (e && e.message && e.message.indexOf("Can only be used on") !== -1) {
                       e.preventDefault();
@@ -123,18 +117,16 @@ export default function RootLayout({
                         notifyButton: { enable: false }
                       });
                     } catch (initErr) {
-                      // Suppress origin or permission rejection
                     }
                   });
                 } catch (err) {
-                  // Safe fallback
                 }
               })();
             `,
           }}
         />
       </head>
-      <body className={`font-sans antialiased`}>
+      <body className="font-sans antialiased">
         {children}
       </body>
     </html>
