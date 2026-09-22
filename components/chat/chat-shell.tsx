@@ -428,8 +428,9 @@ export function ChatShell() {
             {currentSession ? currentSession.name : "ראמי מסארוה"}
           </span>
 
+          {/* Hidden technical badges */}
           <span
-            className="hidden sm:inline-flex items-center gap-1 bg-stone-100 text-stone-700 text-[10px] font-medium px-2 py-0.5 rounded-full border border-stone-200/80"
+            className="hidden"
             title={currentSession ? `מכשיר נעול ומאובטח: ${currentSession.name} (${currentSession.role})` : "נעילת מכשיר אקטיבית"}
           >
             <Lock className="w-2.5 h-2.5 text-emerald-600" />
@@ -439,8 +440,8 @@ export function ChatShell() {
           {isFirestoreConnected && (
             <span
               id="firestore-status-badge"
-              className="hidden lg:inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[10px] font-medium px-2 py-0.5 rounded-full border border-emerald-200/80"
-              title="מסונכרן בזמן אמת ל-Cloud Firestore (מחשב וסמסונג נייד)"
+              className="hidden"
+              title="מסונכרן בזמן אמת ל-Cloud Firestore"
             >
               <Database className="w-2.5 h-2.5 text-emerald-600" />
               <span>ענן מסונכרן</span>
@@ -448,19 +449,22 @@ export function ChatShell() {
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto shrink-0">
+        {/* Redesigned Button Row Toolbar */}
+        <div
+          id="chat-header-actions"
+          className="flex items-center gap-1.5 pointer-events-auto shrink-0 bg-white/90 backdrop-blur-md p-1 rounded-full border border-stone-200/80 shadow-xs"
+        >
+          {/* Hidden dev/admin buttons kept for DOM references but hidden from chat room */}
           <Button
             id="device-security-button"
             onClick={() => setIsAuthModalOpen(true)}
             variant="outline"
             size="sm"
-            className="h-8 sm:h-9 px-2.5 sm:px-3 rounded-full bg-stone-900 hover:bg-stone-800 text-white border border-stone-800 shadow-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer font-medium text-xs backdrop-blur-md"
+            className="hidden"
             aria-label="בקרת נעילת מכשיר והרשאות צוות"
-            title="ניהול נעילת מכשיר (Device Binding) וקישורי הפעלה של עובדי ח. סבן"
           >
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="font-semibold text-xs hidden sm:inline">נעילת מכשיר</span>
-            <span className="font-semibold text-xs sm:hidden">אבטחה</span>
+            <span>נעילת מכשיר</span>
           </Button>
 
           <Button
@@ -469,27 +473,26 @@ export function ChatShell() {
             disabled={isSeeding}
             variant="outline"
             size="sm"
-            className="h-8 sm:h-9 px-2.5 sm:px-3 rounded-full bg-amber-50/90 hover:bg-amber-100/90 text-amber-900 border border-amber-200/80 shadow-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer font-medium text-xs backdrop-blur-md"
+            className="hidden"
             aria-label="הזרק נתוני שיחה ורענן הקשר ב-Cloud Firestore"
-            title="הזרקת נתוני שיחה מלאים ל-Cloud Firestore שנועה תזכור את כל ההקשר התפעולי"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-            <span className="font-semibold text-xs hidden sm:inline">{isSeeding ? "מזריק..." : "הזרק הקשר"}</span>
-            <span className="font-semibold text-xs sm:hidden">הזרק</span>
+            <span>{isSeeding ? "מזריק..." : "הזרק הקשר"}</span>
           </Button>
 
           <PWAInstallButton />
+
           <Button
             id="clear-history-button"
             onClick={handleStartNewSession}
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className="h-8 sm:h-9 px-2.5 sm:px-3 rounded-full bg-white/90 hover:bg-white text-stone-700 hover:text-stone-900 border border-stone-200/80 shadow-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer font-medium text-xs backdrop-blur-md"
+            className="h-8 px-3.5 rounded-full bg-stone-100 hover:bg-stone-200/80 text-stone-800 hover:text-stone-950 font-semibold text-xs flex items-center gap-1.5 transition-all duration-200 active:scale-95 cursor-pointer shadow-2xs border border-stone-200/60 group"
             aria-label="התחל שיחה חדשה ונקה היסטוריה"
             title="מחיקת היסטוריית השיחה והתחלת סשן חדש"
           >
-            <RotateCcw className="w-3.5 h-3.5 text-stone-500" />
-            <span className="font-semibold text-xs">שיחה חדשה</span>
+            <RotateCcw className="w-3.5 h-3.5 text-stone-500 transition-transform duration-300 group-hover:-rotate-90 group-hover:text-stone-800" />
+            <span>שיחה חדשה</span>
           </Button>
         </div>
       </header>

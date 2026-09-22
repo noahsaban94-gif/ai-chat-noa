@@ -634,3 +634,22 @@ div#message-item-OIhXf4iq5qKDJYMSSYQd > div:nth-of-type(2) > div#message-bubble-
   color: #17065b;
   font-family: Arial;
 }
+
+div:nth-of-type(2) > header#chat-header-bar:nth-of-type(1) > div:nth-of-type(2) > button#device-security-button:nth-of-type(1),
+button#device-security-button {
+  display: none !important;
+}
+
+div:nth-of-type(2) > header#chat-header-bar:nth-of-type(1) > div:nth-of-type(2) > button#seed-firestore-button:nth-of-type(2),
+button#seed-firestore-button {
+  display: none !important;
+}
+
+div:nth-of-type(2) > header#chat-header-bar:nth-of-type(1) > div:nth-of-type(1) > span#firestore-status-badge:nth-of-type(9),
+span#firestore-status-badge {
+  display: none !important;
+}
+
+div:nth-of-type(2) > header#chat-header-bar:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(8) {
+  display: none !important;
+}
