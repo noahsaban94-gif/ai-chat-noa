@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useRef, useCallback, type KeyboardEvent, useEffect } from "react"
-import { Square, Mic, MicOff, Brain, Paperclip, X } from "lucide-react"
+import { Square, Mic, MicOff, Brain, Paperclip, X, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import {
@@ -37,6 +37,7 @@ interface ComposerProps {
 export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel, onModelChange }: ComposerProps) {
   const [value, setValue] = useState("")
   const [isRecording, setIsRecording] = useState(false)
+  const [isTranscribing, setIsTranscribing] = useState(false)
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [showImageBounce, setShowImageBounce] = useState(false)
   const [hasAnimated, setHasAnimated] = useState(false)
@@ -44,52 +45,92 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const recognitionRef = useRef<any>(null)
+  const isRecordingRef = useRef(false)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const hasTranscribedViaSpeechRef = useRef(false)
   const baseTextRef = useRef("")
   const finalTranscriptsRef = useRef("")
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-      if (SpeechRecognition) {
-        recognitionRef.current = new SpeechRecognition()
-        recognitionRef.current.continuous = true
-        recognitionRef.current.interimResults = true
-        recognitionRef.current.lang = "he-IL"
+  const handleInput = useCallback(() => {
+    const textarea = textareaRef.current
+    if (textarea) {
+      textarea.style.height = "auto"
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
+    }
+  }, [])
 
-        recognitionRef.current.onresult = (event: any) => {
-          let newFinalText = ""
+  const initRecognition = useCallback(() => {
+    if (typeof window === "undefined") return null
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) return null
 
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            if (event.results[i].isFinal) {
-              const transcript = event.results[i][0].transcript
-              newFinalText += transcript + " "
-            }
-          }
+    try {
+      const recognition = new SpeechRecognition()
+      recognition.continuous = true
+      recognition.interimResults = true
+      recognition.lang = "he-IL"
 
-          if (newFinalText) {
-            finalTranscriptsRef.current += newFinalText
-            setValue(baseTextRef.current + finalTranscriptsRef.current)
-            setTimeout(() => handleInput(), 0)
+      recognition.onresult = (event: any) => {
+        let interimText = ""
+        let newFinalText = ""
+
+        for (let i = 0; i < event.results.length; i++) {
+          const res = event.results[i]
+          if (res.isFinal) {
+            newFinalText += res[0].transcript + " "
+          } else {
+            interimText += res[0].transcript
           }
         }
 
-        recognitionRef.current.onerror = (event: any) => {
-          console.error("[v0] Speech recognition error:", event.error)
-          setIsRecording(false)
-        }
-
-        recognitionRef.current.onend = () => {
-          setIsRecording(false)
+        const fullSpeech = (newFinalText + interimText).trim()
+        if (fullSpeech) {
+          hasTranscribedViaSpeechRef.current = true
+          const prefix = baseTextRef.current ? baseTextRef.current.trim() + " " : ""
+          setValue(prefix + fullSpeech)
+          handleInput()
         }
       }
+
+      recognition.onerror = (event: any) => {
+        console.warn("Speech recognition notice:", event.error)
+        if (event.error === "no-speech") return
+        if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+          setIsRecording(false)
+          isRecordingRef.current = false
+        }
+      }
+
+      recognition.onend = () => {
+        if (isRecordingRef.current && recognitionRef.current) {
+          try {
+            recognitionRef.current.start()
+          } catch {
+            // Already active or stopped
+          }
+        }
+      }
+
+      return recognition
+    } catch (e) {
+      console.warn("Failed to create SpeechRecognition:", e)
+      return null
     }
+  }, [handleInput])
+
+  useEffect(() => {
+    recognitionRef.current = initRecognition()
 
     return () => {
       if (recognitionRef.current) {
-        recognitionRef.current.stop()
+        try {
+          recognitionRef.current.stop()
+        } catch {}
       }
     }
-  }, [])
+  }, [initRecognition])
 
   useEffect(() => {
     // Trigger intro animation after mount
@@ -108,46 +149,117 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
     audio.play().catch(() => {})
   }, [])
 
-  const toggleRecording = useCallback(() => {
-    playClickSound()
+  const stopActiveRecording = useCallback(async () => {
+    isRecordingRef.current = false
+    setIsRecording(false)
 
-    if (!recognitionRef.current) {
-      alert("Speech recognition is not supported in your browser")
-      return
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop()
+      } catch {}
     }
 
-    if (isRecording) {
-      recognitionRef.current.stop()
-      setIsRecording(false)
-      if (mediaStream) {
-        mediaStream.getTracks().forEach((track) => track.stop())
-        setMediaStream(null)
+    if (mediaStream) {
+      mediaStream.getTracks().forEach((track) => track.stop())
+      setMediaStream(null)
+    }
+
+    const recorder = mediaRecorderRef.current
+    if (recorder && recorder.state !== "inactive") {
+      recorder.onstop = async () => {
+        // If Web Speech already captured text, we don't need backup transcription
+        if (hasTranscribedViaSpeechRef.current) return
+
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: recorder.mimeType || "audio/webm",
+        })
+
+        if (audioBlob.size > 2000) {
+          setIsTranscribing(true)
+          try {
+            const formData = new FormData()
+            formData.append("audio", audioBlob, "recording.webm")
+
+            const res = await fetch("/api/transcribe", {
+              method: "POST",
+              body: formData,
+            })
+
+            if (res.ok) {
+              const data = await res.json()
+              if (data.text) {
+                const prefix = baseTextRef.current ? baseTextRef.current.trim() + " " : ""
+                setValue(prefix + data.text)
+                handleInput()
+              }
+            }
+          } catch (err) {
+            console.error("AI Transcription error:", err)
+          } finally {
+            setIsTranscribing(false)
+          }
+        }
       }
+      recorder.stop()
+    }
+  }, [mediaStream, handleInput])
+
+  const toggleRecording = useCallback(async () => {
+    playClickSound()
+
+    if (isRecording) {
+      await stopActiveRecording()
     } else {
       playRecordSound()
       baseTextRef.current = value
       finalTranscriptsRef.current = ""
-      recognitionRef.current.start()
-      setIsRecording(true)
+      hasTranscribedViaSpeechRef.current = false
+      audioChunksRef.current = []
 
-      navigator.mediaDevices
-        .getUserMedia({ audio: true })
-        .then((stream) => {
-          setMediaStream(stream)
-        })
-        .catch((err) => {
-          console.error("[v0] Error getting microphone stream:", err)
-        })
-    }
-  }, [isRecording, value, playClickSound, playRecordSound, mediaStream])
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        setMediaStream(stream)
+        isRecordingRef.current = true
+        setIsRecording(true)
 
-  const handleInput = useCallback(() => {
-    const textarea = textareaRef.current
-    if (textarea) {
-      textarea.style.height = "auto"
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
+        // Setup MediaRecorder for universal AI transcription fallback
+        try {
+          const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+            ? "audio/webm;codecs=opus"
+            : MediaRecorder.isTypeSupported("audio/mp4")
+              ? "audio/mp4"
+              : ""
+          const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
+          recorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) {
+              audioChunksRef.current.push(e.data)
+            }
+          }
+          recorder.start(250)
+          mediaRecorderRef.current = recorder
+        } catch (e) {
+          console.warn("MediaRecorder start notice:", e)
+        }
+
+        // Start Web Speech Recognition
+        if (!recognitionRef.current) {
+          recognitionRef.current = initRecognition()
+        }
+        if (recognitionRef.current) {
+          try {
+            recognitionRef.current.start()
+          } catch (e) {
+            console.warn("Recognition start notice:", e)
+          }
+        }
+      } catch (err) {
+        console.error("Microphone permission error:", err)
+        alert("נא לאשר גישה למיקרופון בהגדרות הדפדפן כדי להקליט הודעות לנועה.")
+        setIsRecording(false)
+        isRecordingRef.current = false
+      }
     }
-  }, [])
+  }, [isRecording, value, playClickSound, playRecordSound, stopActiveRecording, initRecognition])
 
   const handleSend = useCallback(() => {
     if ((!value.trim() && !uploadedImage) || isStreaming || disabled) return
@@ -245,7 +357,13 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
                 handleInput()
               }}
               onKeyDown={handleKeyDown}
-              placeholder={isRecording ? "מקשיבה לך ראמי..." : "כתוב הודעה לנועה... (Shift+Enter לשורה חדשה)"}
+              placeholder={
+                isRecording
+                  ? "מקשיבה לך ראמי... (דבר בחופשיות)"
+                  : isTranscribing
+                    ? "מתמללת את ההקלטה שלך לנועה..."
+                    : "כתוב הודעה לנועה... (Shift+Enter לשורה חדשה)"
+              }
               disabled={isStreaming || disabled}
               rows={1}
               dir="auto"
@@ -309,17 +427,26 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
             <div className="relative">
               <Button
                 onClick={toggleRecording}
-                disabled={isStreaming || disabled}
+                disabled={isStreaming || disabled || isTranscribing}
                 size="icon"
                 className={cn(
-                  "h-9 w-9 shrink-0 transition-all rounded-full relative z-10",
+                  "h-9 w-9 shrink-0 transition-all rounded-full relative z-10 cursor-pointer",
                   isRecording
-                    ? "bg-red-500 hover:bg-red-600 text-white animate-bounce-subtle"
-                    : "bg-zinc-100 hover:bg-zinc-200 text-stone-700",
+                    ? "bg-red-500 hover:bg-red-600 text-white animate-bounce-subtle ring-2 ring-red-300"
+                    : isTranscribing
+                      ? "bg-purple-100 text-purple-700 ring-2 ring-purple-300"
+                      : "bg-zinc-100 hover:bg-zinc-200 text-stone-700",
                 )}
-                aria-label={isRecording ? "Stop recording" : "Start voice input"}
+                aria-label={isRecording ? "עצור הקלטה" : isTranscribing ? "מתמללת שמע..." : "הקלט הודעה קולית לנועה"}
+                title={isRecording ? "לחץ לסיום הקלטה" : isTranscribing ? "מתמללת שמע..." : "הקלט הודעה קולית (דיבור לטקסט)"}
               >
-                {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                {isRecording ? (
+                  <MicOff className="w-4 h-4" />
+                ) : isTranscribing ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
+                ) : (
+                  <Mic className="w-4 h-4" />
+                )}
               </Button>
             </div>
 
