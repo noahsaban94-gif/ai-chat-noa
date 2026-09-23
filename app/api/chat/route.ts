@@ -315,7 +315,8 @@ export const STATIC_LOGISTICS_CATALOG = [
     defaultWarehouse: "סניף 1 התלמיד",
     requiresBelaDeposit: false,
     requiresPalletDeposit: false,
-    aliases: ["גבס ירוק 2.60", "לוח גבס ירוק 260", "גבס עמיד לחות", "ירוק 2.60", "גבס למקלחות"]
+    aliases: ["גבס ירוק 2.60", "לוח גבס ירוק 260", "גבס עמיד לחות", "ירוק 2.60", "גבס למקלחות", "112260"],
+    youtubeUrl: "https://www.youtube.com/watch?v=6B0Ih74mpkk"
   },
   {
     sku: "111200",

@@ -34,6 +34,7 @@ export async function GET(req: NextRequest) {
       imageUrl: result.imageUrl || null,
       localImageUrl: result.localImageUrl || null,
       sheetImageUrl: result.sheetImageUrl || null,
+      youtubeUrl: result.youtubeUrl || null,
       source: result.source || "none",
       hasLocalFile: result.hasLocalFile || false,
       hasSheetUrl: result.hasSheetUrl || false,

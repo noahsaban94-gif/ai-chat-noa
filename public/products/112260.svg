@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="600" height="450">
+  <defs>
+    <linearGradient id="bgGradGreen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064E3B" />
+      <stop offset="50%" stop-color="#065F46" />
+      <stop offset="100%" stop-color="#022C22" />
+    </linearGradient>
+    <linearGradient id="boardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34D399" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+    <pattern id="blueprintGrid" width="30" height="30" patternUnits="userSpaceOnUse">
+      <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.05" />
+    </pattern>
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- רקע גרדיאנט ירוק איכותי -->
+  <rect width="600" height="450" fill="url(#bgGradGreen)" />
+  <rect width="600" height="450" fill="url(#blueprintGrid)" />
+
+  <!-- כותרת ראשית ומיתוג חברה -->
+  <g transform="translate(30, 30)">
+    <rect x="0" y="0" width="540" height="45" rx="8" fill="#000000" fill-opacity="0.35" />
+    <text x="20" y="28" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="700" fill="#6EE7B7">ח. סבן חומרי בניין (1994) בע״מ</text>
+    <text x="520" y="28" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" fill="#E5E7EB" text-anchor="end">קטלוג לוגיסטי • גבס עמיד לחות</text>
+  </g>
+
+  <!-- כרטיס תוכן מרכזי מעוצב -->
+  <g transform="translate(50, 95)" filter="url(#cardShadow)">
+    <rect x="0" y="0" width="500" height="300" rx="16" fill="#0B131E" fill-opacity="0.85" stroke="#10B981" stroke-width="2" stroke-opacity="0.4"/>
+    
+    <!-- תגית מק"ט עליונה -->
+    <g transform="translate(25, 25)">
+      <rect x="0" y="0" width="130" height="32" rx="16" fill="#059669"/>
+      <text x="65" y="21" font-family="system-ui, sans-serif" font-size="15" font-weight="900" fill="#F0FDF4" text-anchor="middle">מק"ט: 112260</text>
+    </g>
+
+    <!-- תגית חדרים רטובים / עמיד לחות -->
+    <g transform="translate(475, 25)">
+      <rect x="-140" y="0" width="140" height="32" rx="16" fill="#064E3B" stroke="#34D399" stroke-width="1"/>
+      <text x="-70" y="21" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#A7F3D0" text-anchor="middle">💧 עמידות בלחות</text>
+    </g>
+
+    <!-- אייקון / איור המוצר -->
+    <g transform="translate(210, 85)">
+      <!-- לוח גבס ירוק תלת ממד -->
+      <polygon points="10,120 140,120 170,35 40,35" fill="url(#boardGrad)" stroke="#10B981" stroke-width="3"/>
+      <polygon points="140,120 170,35 178,42 148,127" fill="#047857" stroke="#059669" stroke-width="2"/>
+      <polygon points="10,120 140,120 148,127 18,127" fill="#065F46" stroke="#059669" stroke-width="2"/>
+      <!-- תו פנימי / מפרט -->
+      <rect x="52" y="58" width="76" height="42" rx="6" fill="#022C22" opacity="0.9" stroke="#6EE7B7" stroke-width="1"/>
+      <text x="90" y="76" font-family="system-ui, sans-serif" font-size="11" font-weight="900" fill="#34D399" text-anchor="middle">ירוק 2.60 מ'</text>
+      <text x="90" y="91" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#D1FAE5" text-anchor="middle">עובי 12.5 מ״מ</text>
+    </g>
+
+    <!-- שם מוצר ראשי בעברית -->
+    <text x="250" y="240" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="900" fill="#FFFFFF" text-anchor="middle" direction="rtl">
+      לוח גבס ירוק 260 עמידות מוגברת בלחות
+    </text>
+
+    <!-- תיאור משני -->
+    <text x="250" y="268" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" fill="#A7F3D0" text-anchor="middle" direction="rtl">
+      לוח תקני 1490 לחדרי רחצה ומקלחות • משקל: 24 ק"ג • ניצבים מרווח 40 ס"מ
+    </text>
+  </g>
+
+  <!-- חותמת מקורית בתחתית -->
+  <g transform="translate(30, 415)">
+    <circle cx="10" cy="10" r="4" fill="#34D399"/>
+    <text x="22" y="14" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#9CA3AF">מלאי מנוהל במערכת קומקס ו-ERP סבן</text>
+    <text x="540" y="14" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#6EE7B7" text-anchor="end">נועה AI • סרטון הדרכה זמין</text>
+  </g>
+</svg>

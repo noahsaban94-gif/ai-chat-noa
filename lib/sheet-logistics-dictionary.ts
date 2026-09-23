@@ -21,6 +21,7 @@ export interface SheetLogisticsItem {
   driver: string
   productImageColJ?: string
   imageUrl?: string // עמודה K: תמונה (לינק ישיר כגון PostImage / Google Drive / URL)
+  youtubeUrl?: string // עמודה U או KATK / יוטיוב: קישור סרטון הדרכה יוטיוב
 }
 
 const SPREADSHEET_ID = "1VA9J6n9IYcooO_s2xOpnkvyDQWWQD3pfhh0cnenCkoA"
@@ -119,6 +120,22 @@ export async function fetchSheetLogisticsDictionary(forceRefresh = false): Promi
 
     const items: SheetLogisticsItem[] = []
 
+    // בדיקת כותרות לאיתור עמודת יוטיוב / וידאו / Column U דינמית
+    const headerCols = parseCsvLine(lines[0]).map((h) => h.replace(/^"+|"+$/g, "").trim().toLowerCase())
+    let youtubeColIndex = headerCols.findIndex(
+      (h) =>
+        h.includes("יוטיוב") ||
+        h.includes("youtube") ||
+        h.includes("סרטון") ||
+        h.includes("וידאו") ||
+        h.includes("הדרכה") ||
+        h.includes("katk") ||
+        h === "u"
+    )
+    if (youtubeColIndex === -1 && headerCols.length > 20) {
+      youtubeColIndex = 20 // עמודה U היא אינדקס 20 (A=0 ... U=20)
+    }
+
     // דילוג על שורת הכותרת
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i]
@@ -138,9 +155,40 @@ export async function fetchSheetLogisticsDictionary(forceRefresh = false): Promi
       const driver = (cols[8] || "").replace(/^"+|"+$/g, "").trim()
       const colJ = (cols[9] || "").replace(/^"+|"+$/g, "").trim()
       const colK = (cols[10] || "").replace(/^"+|"+$/g, "").trim()
+      const colU = (cols[20] || "").replace(/^"+|"+$/g, "").trim()
+      const dynamicColYt = youtubeColIndex !== -1 ? (cols[youtubeColIndex] || "").replace(/^"+|"+$/g, "").trim() : ""
 
-      // עמודה K היא העמודה הראשית של "תמונה", עם גיבוי מעמודה J אם יש בה לינק
-      const rawImage = (colK.startsWith("http") || colK.startsWith("/")) ? colK : ((colJ.startsWith("http") || colJ.startsWith("/")) ? colJ : "")
+      // איתור קישור יוטיוב מתוך עמודה U, עמודת KATK, או סריקה של כל תא בשורה
+      let rawYoutube: string | undefined = undefined
+      if (colU.includes("youtube.com") || colU.includes("youtu.be")) {
+        rawYoutube = colU
+      } else if (dynamicColYt.includes("youtube.com") || dynamicColYt.includes("youtu.be")) {
+        rawYoutube = dynamicColYt
+      } else if (colK.includes("youtube.com") || colK.includes("youtu.be")) {
+        rawYoutube = colK
+      } else {
+        // סריקה עמידה של כל התאים לאיתור קישור יוטיוב
+        for (const cell of cols) {
+          const trimmed = cell.replace(/^"+|"+$/g, "").trim()
+          if (trimmed.includes("youtube.com/watch") || trimmed.includes("youtu.be/")) {
+            rawYoutube = trimmed
+            break
+          }
+        }
+      }
+
+      // גיבוי למוצר 112260 (לוח גבס ירוק עמיד לחות 260) - סרטון הדרכה רשמי
+      if (!rawYoutube && (sku === "112260" || name.includes("גבס ירוק 260"))) {
+        rawYoutube = "https://www.youtube.com/watch?v=6B0Ih74mpkk"
+      }
+
+      // עמודה K היא העמודה הראשית של "תמונה", עם גיבוי מעמודה J אם יש בה לינק (וודא שאינו יוטיוב)
+      let rawImage = ""
+      if (!colK.includes("youtube.com") && !colK.includes("youtu.be") && (colK.startsWith("http") || colK.startsWith("/"))) {
+        rawImage = colK
+      } else if (!colJ.includes("youtube.com") && !colJ.includes("youtu.be") && (colJ.startsWith("http") || colJ.startsWith("/"))) {
+        rawImage = colJ
+      }
       const imageUrl = normalizeProductImageUrl(rawImage)
 
       items.push({
@@ -155,6 +203,7 @@ export async function fetchSheetLogisticsDictionary(forceRefresh = false): Promi
         driver,
         productImageColJ: colJ,
         imageUrl,
+        youtubeUrl: rawYoutube,
       })
     }
 

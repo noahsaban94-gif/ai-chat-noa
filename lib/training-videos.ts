@@ -19,6 +19,48 @@ export interface TrainingProduct {
  */
 export const TRAINING_PRODUCTS: TrainingProduct[] = [
   {
+    id: "plasterboard-green-moisture-resistant-260",
+    name: "לוח גבס ירוק 260 עמידות מוגברת בלחות (עובי 12.5 מ״מ)",
+    category: "גבס ובנייה יבשה",
+    sku: "112260",
+    keywords: [
+      "112260",
+      "לוח גבס ירוק",
+      "גבס ירוק",
+      "גבס ירוק 260",
+      "לוח ירוק",
+      "עמידות מוגברת בלחות",
+      "עמיד לחות",
+      "עמיד ברטיבות",
+      "חדרים רטובים",
+      "מקלחות",
+      "חדרי רחצה",
+      "גבס למקלחות",
+      "לוחות גבס",
+      "אורבונד ירוק",
+      "טמבור ירוק",
+      "12.5",
+      "עובי 12.5",
+      "260",
+    ],
+    youtubeUrl: "https://www.youtube.com/watch?v=6B0Ih74mpkk",
+    videoId: "6B0Ih74mpkk",
+    videoTitle: "לוחות גבס ירוקים - עמידות ברטיבות, עוביים ויישום מקצועי בחדרים רטובים",
+    duration: "4:15",
+    description: "סרטון הדרכה מקצועי עבור לוח גבס ירוק 2.60 מ' (עובי 12.5 מ\"מ): עמידות מוגברת בלחות ומניעת ספיגת מים, התקנה נכונה בחדרי רחצה ומקלחות, מרווחי ניצבים ואיטום חיבורים.",
+    keyTechnicalSteps: [
+      "הכנת קונסטרוקציה: התקנת ניצבים במרווח של מקסימום 40 ס\"מ במרכז בחדרים רטובים (לעומת 60 ס\"מ בקיר רגיל) לתמיכה מחוזקת.",
+      "הגבהה מהרצפה: חובה להשאיר מרווח של 10-15 מ\"מ בין תחתית הלוח לרצפה למניעת עלייה קפילרית של נוזלים ומים.",
+      "קיבוע בברגים: שימוש בברגי גבס שחורים/פוספטיים עמידי קורוזיה כל 20-25 ס\"מ, ללא קריעת שכבת הנייר הירוק המוגנת.",
+      "איטום מישקים: מילוי מישקים בשפכטל ייעודי עמיד לחות (כגון שפכטל ירוק או פוליפיל גבס) ושילוב סרט שריון / רשת פיברגלס.",
+      "שכבת איטום נוספת: במקלחות ובאזורים עם התזה ישירה של מים (wet area), חובה ליישם חומר איטום צמנטי/פולימרי (כדוגמת סיקה 107) על גבי הגבס הירוק לפני הדבקת הקרמיקה.",
+    ],
+    safetyNotes: [
+      "אין ליישם לוח גבס ירוק באזורים פתוחים לגשם ישיר או כשכבת קיר חוץ.",
+      "לוחות 2.60 מ' שוקלים כ-24 ק\"ג — מומלץ להרים ולהרכיב בשני עובדים למניעת שבר בקצוות.",
+    ],
+  },
+  {
     id: "sika-top-seal-107",
     name: "איטום צמנטי דו-רכיבי סיקה טופ סיל 107 (SikaTop Seal-107)",
     category: "איטום",
@@ -289,18 +331,25 @@ export function findTrainingVideos(query: string): TrainingProduct[] {
   for (const product of TRAINING_PRODUCTS) {
     let score = 0
 
+    // Exact SKU match in query (highest priority)
+    if (product.sku && normalizedQuery.includes(product.sku.toLowerCase())) {
+      score += 50
+    }
+
     // Match in product name
     if (product.name.toLowerCase().includes(normalizedQuery)) {
-      score += 10
+      score += 20
+    } else if (normalizedQuery.includes(product.name.toLowerCase())) {
+      score += 15
     }
 
     // Match in keywords
     for (const keyword of product.keywords) {
       const lowerKw = keyword.toLowerCase()
       if (normalizedQuery.includes(lowerKw)) {
-        score += 5
+        score += 8
       } else if (lowerKw.includes(normalizedQuery)) {
-        score += 3
+        score += 4
       }
     }
 

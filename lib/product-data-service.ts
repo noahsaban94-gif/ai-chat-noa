@@ -33,6 +33,8 @@ export interface ProductRecord {
   imageUrl?: string
   /** Raw Image value from secondary column (עמודה J: תמונת מוצר) */
   rawImageColJ?: string
+  /** Official YouTube Training Video URL (עמודה U / KATK / סרטון הדרכה) */
+  youtubeUrl?: string
   /** Data resolution source */
   source: "apps_script" | "google_sheet" | "cache"
 }
@@ -44,6 +46,7 @@ export interface ProductLookupResult {
   imageUrl?: string
   localImageUrl?: string | null
   sheetImageUrl?: string | null
+  youtubeUrl?: string | null
   source?: "local_upload" | "sheet_column_k" | "catalog_default" | "none"
   hasLocalFile?: boolean
   hasSheetUrl?: boolean
@@ -322,6 +325,16 @@ export async function fetchProductDataFromScript(
     // Column K is specifically "תמונה", column J is "תמונת מוצר"
     let imageColKIndex = headerCols.findIndex((h) => h === "תמונה" || h === "image")
     let imageColJIndex = headerCols.findIndex((h) => h.includes("תמונת מוצר") || h.includes("product image"))
+    let youtubeColIndex = headerCols.findIndex(
+      (h) =>
+        h.includes("יוטיוב") ||
+        h.includes("youtube") ||
+        h.includes("סרטון") ||
+        h.includes("וידאו") ||
+        h.includes("הדרכה") ||
+        h.includes("katk") ||
+        h === "u"
+    )
 
     // Fallbacks if header indices not matched
     if (skuColIndex === -1) skuColIndex = 0
@@ -335,6 +348,7 @@ export async function fetchProductDataFromScript(
     if (driverColIndex === -1) driverColIndex = 8
     if (imageColJIndex === -1) imageColJIndex = 9
     if (imageColKIndex === -1) imageColKIndex = 10
+    if (youtubeColIndex === -1 && headerCols.length > 20) youtubeColIndex = 20
 
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i]
@@ -355,9 +369,39 @@ export async function fetchProductDataFromScript(
 
       const rawColJ = (cols[imageColJIndex] || "").replace(/^"+|"+$/g, "").trim()
       const rawColK = (cols[imageColKIndex] || "").replace(/^"+|"+$/g, "").trim()
+      const rawColU = (cols[20] || "").replace(/^"+|"+$/g, "").trim()
+      const dynamicColYt = youtubeColIndex !== -1 ? (cols[youtubeColIndex] || "").replace(/^"+|"+$/g, "").trim() : ""
+
+      // איתור קישור יוטיוב מתוך עמודה U, עמודת KATK, או סריקת התאים
+      let youtubeUrl: string | undefined = undefined
+      if (rawColU.includes("youtube.com") || rawColU.includes("youtu.be")) {
+        youtubeUrl = rawColU
+      } else if (dynamicColYt.includes("youtube.com") || dynamicColYt.includes("youtu.be")) {
+        youtubeUrl = dynamicColYt
+      } else if (rawColK.includes("youtube.com") || rawColK.includes("youtu.be")) {
+        youtubeUrl = rawColK
+      } else {
+        for (const cell of cols) {
+          const trimmed = cell.replace(/^"+|"+$/g, "").trim()
+          if (trimmed.includes("youtube.com/watch") || trimmed.includes("youtu.be/")) {
+            youtubeUrl = trimmed
+            break
+          }
+        }
+      }
+
+      // גיבוי למוצר 112260 - לוח גבס ירוק 260
+      if (!youtubeUrl && (sku === "112260" || name.includes("גבס ירוק 260"))) {
+        youtubeUrl = "https://www.youtube.com/watch?v=6B0Ih74mpkk"
+      }
 
       // Specifically targeting column K ("תמונה"), with secondary fallback to column J
-      const rawImage = rawColK || rawColJ
+      let rawImage = ""
+      if (!rawColK.includes("youtube.com") && !rawColK.includes("youtu.be") && (rawColK.startsWith("http") || rawColK.startsWith("/"))) {
+        rawImage = rawColK
+      } else if (!rawColJ.includes("youtube.com") && !rawColJ.includes("youtu.be") && (rawColJ.startsWith("http") || rawColJ.startsWith("/"))) {
+        rawImage = rawColJ
+      }
       const imageUrl = normalizeProductImageUrl(rawImage)
 
       products.push({
@@ -372,6 +416,7 @@ export async function fetchProductDataFromScript(
         driver,
         rawImageColJ: rawColJ,
         imageUrl,
+        youtubeUrl,
         source: "google_sheet",
       })
     }
@@ -419,6 +464,7 @@ export async function lookupProductBySku(
 
   const sheetImageUrl = product?.imageUrl || null
   const localImageUrl = localCheck.localUrl
+  const youtubeUrl = product?.youtubeUrl || (cleanSku === "112260" ? "https://www.youtube.com/watch?v=6B0Ih74mpkk" : null)
   const hasLocalFile = Boolean(localImageUrl)
   const hasSheetUrl = Boolean(sheetImageUrl)
 
@@ -448,6 +494,7 @@ export async function lookupProductBySku(
       unit: "יח'",
       source: "cache",
       imageUrl: chosenImageUrl,
+      youtubeUrl: youtubeUrl || undefined,
     }
 
     return {
@@ -456,17 +503,19 @@ export async function lookupProductBySku(
       product: {
         ...finalProduct,
         imageUrl: chosenImageUrl,
+        youtubeUrl: youtubeUrl || undefined,
       },
       imageUrl: chosenImageUrl,
       localImageUrl,
       sheetImageUrl,
+      youtubeUrl,
       source,
       hasLocalFile,
       hasSheetUrl,
     }
   }
 
-  return { found: false, sku }
+  return { found: false, sku, youtubeUrl: null }
 }
 
 /**

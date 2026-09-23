@@ -13,6 +13,7 @@ import path from "path"
 import { PRODUCT_MEDIA_CATALOG } from "./product-media"
 import { fetchSheetLogisticsDictionary, type SheetLogisticsItem } from "./sheet-logistics-dictionary"
 import { extractSkuFromText } from "./product-data-service"
+import { TRAINING_PRODUCTS } from "./training-videos"
 
 export interface ScannedProductMedia {
   sku: string
@@ -30,6 +31,7 @@ export interface ResolvedProductMedia {
   primaryUrl: string
   localUrl: string | null
   sheetUrl: string | null
+  youtubeUrl: string | null
   hasLocalFile: boolean
   hasSheetUrl: boolean
   isRealLocalUpload: boolean
@@ -165,6 +167,7 @@ export async function resolveProductMedia(sku: string): Promise<ResolvedProductM
   const local = scanned[cleanSku]
   
   let sheetUrl: string | null = null
+  let sheetYoutubeUrl: string | null = null
   let productName = local?.name || PRODUCT_MEDIA_CATALOG[cleanSku]?.name || `מוצר ${cleanSku}`
 
   try {
@@ -176,12 +179,28 @@ export async function resolveProductMedia(sku: string): Promise<ResolvedProductM
       } else if (match.productImageColJ && match.productImageColJ.startsWith("http")) {
         sheetUrl = match.productImageColJ
       }
+      if (match.youtubeUrl) {
+        sheetYoutubeUrl = match.youtubeUrl
+      }
       if (match.name) {
         productName = match.name
       }
     }
   } catch (e) {
     console.warn("[ProductMediaServer] Sheet fetch error during resolve:", e)
+  }
+
+  // איתור סרטון הדרכה
+  let youtubeUrl: string | null = sheetYoutubeUrl
+  if (!youtubeUrl) {
+    const trainingMatch = TRAINING_PRODUCTS.find(
+      (p) => p.sku?.toLowerCase() === cleanSku || p.keywords.some((k) => k.toLowerCase() === cleanSku)
+    )
+    if (trainingMatch) {
+      youtubeUrl = trainingMatch.youtubeUrl
+    } else if (cleanSku === "112260") {
+      youtubeUrl = "https://www.youtube.com/watch?v=6B0Ih74mpkk"
+    }
   }
 
   const localUrl = local ? local.url : null
@@ -212,6 +231,7 @@ export async function resolveProductMedia(sku: string): Promise<ResolvedProductM
     primaryUrl,
     localUrl,
     sheetUrl,
+    youtubeUrl,
     hasLocalFile: Boolean(localUrl),
     hasSheetUrl: Boolean(sheetUrl),
     isRealLocalUpload,
@@ -357,12 +377,14 @@ export async function buildTargetedProductMediaSnippet(userMessage: string): Pro
   // זיהוי לפי מילות מפתח מובילות אם לא זוהה מק"ט מפורש
   let targetSku = detectedSku
   if (!targetSku) {
-    if (/חול|רמל|11501/i.test(userMessage)) targetSku = "11501"
+    if (/112260|גבס ירוק|ירוק 260|עמיד.*לחות|עמידות מוגברת|גבס למקלחות/i.test(userMessage)) targetSku = "112260"
+    else if (/חול|רמל|11501/i.test(userMessage)) targetSku = "11501"
     else if (/סומסום|סמסם|11511/i.test(userMessage)) targetSku = "11511"
     else if (/טיט|11551/i.test(userMessage)) targetSku = "11551"
     else if (/מלט|נשר|10002/i.test(userMessage)) targetSku = "10002"
     else if (/חמרה|11570/i.test(userMessage)) targetSku = "11570"
     else if (/בלוק|12204/i.test(userMessage)) targetSku = "12204"
+    else if (/111260|גבס לבן/i.test(userMessage)) targetSku = "111260"
   }
 
   if (!targetSku) {
@@ -370,13 +392,28 @@ export async function buildTargetedProductMediaSnippet(userMessage: string): Pro
   }
 
   const resolved = await resolveProductMedia(targetSku)
+  const isVideoRequested = /סרטון|הדרכה|וידאו|יוטיוב|youtube|video|katk/i.test(userMessage)
+
+  let videoSection = ""
+  if (resolved.youtubeUrl) {
+    videoSection = `
+- **קישור סרטון הדרכה מקצועי (עמודה U / מילון לוגיסטי):** \`${resolved.youtubeUrl}\`
+${isVideoRequested || targetSku === "112260" ? `
+**חובה חמורה: המשתמש ביקש סרטון הדרכה או שאל על מוצר עם הדרכה!**
+עלייך לכלול בתשובתך את סרטון היוטיוב בתחביר Markdown הבא, בשורה נפרדת לחלוטין (כדי שנגן היוטיוב המשובץ יוצג מיד בממשק):
+[סרטון הדרכה מקצועי: ${resolved.name}](${resolved.youtubeUrl})
+
+בנוסף, הצג את שלבי היישום הטכניים העיקריים של המוצר (הכנת תשתית, מרווחי ניצבים 40 ס"מ בחדרים רטובים, הגבהה 10-15 מ"מ מהרצפה, שימוש בברגים עמידי קורוזיה ושפכטל עמיד לחות, ושכבת איטום סיקה 107 במקלחות).
+` : ""}`
+  }
 
   return `
-### 🚨 חובה מיידית: מוצר זוהה בהודעת המשתמש — הציגי את תמונת המוצר!
+### 🚨 חובה מיידית: מוצר זוהה בהודעת המשתמש — הציגי את תמונת המוצר${resolved.youtubeUrl ? " וסרטון ההדרכה" : ""}!
 המשתמש מתייחס כעת למוצר מק"ט **${resolved.sku}** (${resolved.name}).
 - **קובץ מקומי במערכת:** ${resolved.localUrl ? `${resolved.localUrl} (סטטוס: ${resolved.isRealLocalUpload ? "קובץ אמיתי" : "ברירת מחדל"})` : "לא קיים"}
 - **קישור מגיליון מילון_לוגיסטי (עמודה K):** ${resolved.sheetUrl || "לא קיים"}
 - **כתובת התמונה הראשית המחייבת לשימוש כעת:** \`${resolved.primaryUrl}\`
+${videoSection}
 
 **הנחיה בלתי ניתנת לערעור:**
 עלייך לכלול בתשובתך את תמונת המוצר המדויקת בתחביר Markdown הבא, בשורה נפרדת לחלוטין עם שורה ריקה מעליה ושורה ריקה מתחתיה:
