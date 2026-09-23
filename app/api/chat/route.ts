@@ -1035,7 +1035,7 @@ ${matchedTrainingVideos.slice(0, 2).map((v) => `* **${v.name}**
 ### ⚡ אירוע למידה בזמן אמת מהודעה זו:
 - ראמי לימד אותך כרגע כלל חדש: "${learningTrigger.cleanedRule}"
 - קטגוריה שסווגה: ${learningTrigger.category}${learningTrigger.entity ? ` | ישות מזוהה: ${learningTrigger.entity}` : ""}
-- הכלל נצרב ונשמר בהצלחה ב-Firestore בקולקציית learned_knowledge לכל השיחות הבאות.
+- הכלל נצרב ונשמר בהצלחה ב-Firestore במאגר הזיכרון לכל השיחות הבאות.
 - **הנחיית אישור לראמי:** אשרי לו בחום ובביטחון שהכלל נצרב בזיכרון הקבוע שלך (למשל: "רשמתי לפניי וצרבתי בזיכרון הקבוע — החל מעכשיו אני איישם כלל זה בכל סידורי העבודה והמענה").`
       } catch (err) {
         console.warn("Error saving learned fact from chat route:", err)

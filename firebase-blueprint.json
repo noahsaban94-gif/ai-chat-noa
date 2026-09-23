@@ -221,10 +221,6 @@
     "/authorized_users/{userId}": {
       "schema": "AuthorizedUser",
       "description": "Authorized operators and device binding profiles"
-    },
-    "/learned_knowledge/{factId}": {
-      "schema": "LearnedKnowledge",
-      "description": "Autonomous learned memory facts and operational rules"
     }
   }
 }

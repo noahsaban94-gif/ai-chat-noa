@@ -1,5 +1,7 @@
 import {
   collection,
+  doc,
+  setDoc,
   addDoc,
   getDocs,
   query,
@@ -7,6 +9,7 @@ import {
   orderBy,
   limit as firestoreLimit,
   serverTimestamp,
+  increment,
   type Timestamp,
 } from "firebase/firestore"
 import { db } from "./firebase-auth"
@@ -31,6 +34,9 @@ export interface ExtractedLearningTrigger {
   category: LearnedCategory
   entity?: string
 }
+
+const LEARNED_CONVERSATION_ID = "system_learned_knowledge"
+const LEARNED_SUBCOLLECTION = "messages"
 
 // זיכרון מקומי מהיר וגיבוי (In-memory fallback cache) למקרה של עיכוב רשת או חוסר חיבור
 const inMemoryLearnedRules: LearnedKnowledgeDoc[] = [
@@ -257,7 +263,8 @@ export async function saveLearnedFact(
   }
 
   try {
-    const colRef = collection(db, "learned_knowledge")
+    const parentDocRef = doc(db, "conversations", LEARNED_CONVERSATION_ID)
+    const colRef = collection(parentDocRef, LEARNED_SUBCOLLECTION)
     const docData: Record<string, unknown> = {
       rule: cleanRule,
       category,
@@ -272,6 +279,18 @@ export async function saveLearnedFact(
 
     const docRef = await addDoc(colRef, docData)
     memoryDoc.id = docRef.id
+
+    // עדכון מסמך האב של מאגר הזיכרון
+    await setDoc(
+      parentDocRef,
+      {
+        type: "learned_knowledge_store",
+        updatedAt: serverTimestamp(),
+        rulesCount: increment(1),
+      },
+      { merge: true }
+    ).catch(() => {})
+
     return docRef.id
   } catch (err) {
     console.warn("Could not save learned fact to Firestore, stored in local memory:", err)
@@ -309,62 +328,34 @@ export async function getActiveLearnedKnowledge(limitCount = 40): Promise<string
 export async function getActiveLearnedRecords(limitCount = 40): Promise<LearnedKnowledgeDoc[]> {
   if (db) {
     try {
-      const colRef = collection(db, "learned_knowledge")
+      const colRef = collection(db, "conversations", LEARNED_CONVERSATION_ID, LEARNED_SUBCOLLECTION)
 
-      // ניסיון ראשון: שאילתה משולבת מסודרת לפי זמן יורד
-      try {
-        const q = query(
-          colRef,
-          where("isActive", "==", true),
-          orderBy("createdAt", "desc"),
-          firestoreLimit(limitCount)
-        )
-        const snap = await getDocs(q)
-        if (!snap.empty) {
-          const list: LearnedKnowledgeDoc[] = []
-          snap.forEach((d) => {
-            const data = d.data()
-            list.push({
-              id: d.id,
-              rule: String(data.rule || ""),
-              category: (data.category as LearnedCategory) || "general",
-              entity: data.entity ? String(data.entity) : undefined,
-              learnedFrom: String(data.learnedFrom || "rami_chat"),
-              isActive: Boolean(data.isActive),
-              createdAt: data.createdAt,
-            })
+      // ניסיון ראשון: שאילתה עם סינון isActive ומיון בזיכרון
+      const q = query(colRef, where("isActive", "==", true), firestoreLimit(limitCount * 2))
+      const snap = await getDocs(q)
+      if (!snap.empty) {
+        const list: LearnedKnowledgeDoc[] = []
+        snap.forEach((d) => {
+          const data = d.data()
+          list.push({
+            id: d.id,
+            rule: String(data.rule || ""),
+            category: (data.category as LearnedCategory) || "general",
+            entity: data.entity ? String(data.entity) : undefined,
+            learnedFrom: String(data.learnedFrom || "rami_chat"),
+            isActive: Boolean(data.isActive),
+            createdAt: data.createdAt,
           })
-          return list
-        }
-      } catch (compoundErr) {
-        // במקרה שאינדקס טרם נוצר ב-Firebase Cloud, מבצעים שאילתת שוויון וממיינים בזיכרון
-        console.warn("Compound index fallback for learned_knowledge, querying equality only:", compoundErr)
-        const simpleQ = query(colRef, where("isActive", "==", true), firestoreLimit(limitCount * 2))
-        const snap = await getDocs(simpleQ)
-        if (!snap.empty) {
-          const list: LearnedKnowledgeDoc[] = []
-          snap.forEach((d) => {
-            const data = d.data()
-            list.push({
-              id: d.id,
-              rule: String(data.rule || ""),
-              category: (data.category as LearnedCategory) || "general",
-              entity: data.entity ? String(data.entity) : undefined,
-              learnedFrom: String(data.learnedFrom || "rami_chat"),
-              isActive: Boolean(data.isActive),
-              createdAt: data.createdAt,
-            })
-          })
+        })
 
-          // מיון בזיכרון מהחדש לישן
-          list.sort((a, b) => {
-            const timeA = (a.createdAt as any)?.seconds || 0
-            const timeB = (b.createdAt as any)?.seconds || 0
-            return timeB - timeA
-          })
+        // מיון מהחדש לישן
+        list.sort((a, b) => {
+          const timeA = (a.createdAt as any)?.seconds || (a.createdAt instanceof Date ? a.createdAt.getTime() / 1000 : 0)
+          const timeB = (b.createdAt as any)?.seconds || (b.createdAt instanceof Date ? b.createdAt.getTime() / 1000 : 0)
+          return timeB - timeA
+        })
 
-          return list.slice(0, limitCount)
-        }
+        return list.slice(0, limitCount)
       }
     } catch (err) {
       console.warn("Could not retrieve learned knowledge from Firestore, using memory fallback:", err)
