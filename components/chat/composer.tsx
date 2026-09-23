@@ -3,9 +3,10 @@
 import type React from "react"
 
 import { useState, useRef, useCallback, type KeyboardEvent, useEffect } from "react"
-import { Square, Mic, MicOff, Brain, Paperclip, X, Loader2 } from "lucide-react"
+import { Square, Mic, MicOff, Brain, Paperclip, X, Loader2, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { extractSkuFromText } from "@/lib/product-data-service"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,9 +33,20 @@ interface ComposerProps {
   disabled?: boolean
   selectedModel: AIModel
   onModelChange: (model: AIModel) => void
+  isSkuSearching?: boolean
+  searchingSku?: string | null
 }
 
-export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel, onModelChange }: ComposerProps) {
+export function Composer({
+  onSend,
+  onStop,
+  isStreaming,
+  disabled,
+  selectedModel,
+  onModelChange,
+  isSkuSearching = false,
+  searchingSku = null,
+}: ComposerProps) {
   const [value, setValue] = useState("")
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
@@ -42,6 +54,9 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
   const [showImageBounce, setShowImageBounce] = useState(false)
   const [hasAnimated, setHasAnimated] = useState(false)
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null)
+  const [localSearching, setLocalSearching] = useState(false)
+  const [localSku, setLocalSku] = useState<string | null>(null)
+
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const recognitionRef = useRef<any>(null)
@@ -50,6 +65,21 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
   const audioChunksRef = useRef<Blob[]>([])
   const speechRecognitionTextRef = useRef("")
   const baseTextRef = useRef("")
+
+  // SKU detection from current input text
+  const previewSku = extractSkuFromText(value)
+  const isQueryingSku = Boolean(isSkuSearching || localSearching)
+  const activeSku = searchingSku || localSku || previewSku
+
+  useEffect(() => {
+    if (!isStreaming && localSearching) {
+      const timer = setTimeout(() => {
+        setLocalSearching(false)
+        setLocalSku(null)
+      }, 2500)
+      return () => clearTimeout(timer)
+    }
+  }, [isStreaming, localSearching])
 
   const adjustTextareaHeight = useCallback(() => {
     const textarea = textareaRef.current
@@ -305,6 +335,11 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
     if ((!value.trim() && !uploadedImage) || isStreaming || disabled) return
     playClickSound()
 
+    if (previewSku) {
+      setLocalSearching(true)
+      setLocalSku(previewSku)
+    }
+
     if (isRecording && recognitionRef.current) {
       recognitionRef.current.stop()
       setIsRecording(false)
@@ -317,7 +352,7 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto"
     }
-  }, [value, uploadedImage, isStreaming, disabled, onSend, isRecording, playClickSound])
+  }, [value, uploadedImage, isStreaming, disabled, onSend, isRecording, playClickSound, previewSku])
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -394,16 +429,62 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
       <div className="relative max-w-2xl mx-auto pointer-events-auto">
         <div
           className={cn(
-            "flex flex-col gap-3 p-4 bg-white border-stone-200 transition-all duration-200 border-none border-0 overflow-hidden relative rounded-3xl",
+            "flex flex-col gap-3 p-4 bg-white border-stone-200 transition-all duration-300 border-none border-0 overflow-hidden relative rounded-3xl",
             "focus-within:border-stone-300 focus-within:ring-2 focus-within:ring-stone-200",
+            isQueryingSku && "ring-2 ring-amber-400/50 border-amber-300/80 sku-searching-glow"
           )}
           style={{
             minHeight: "171px",
             height: "auto",
-            boxShadow:
-              "rgba(14, 63, 126, 0.06) 0px 0px 0px 1px, rgba(42, 51, 69, 0.06) 0px 1px 1px -0.5px, rgba(42, 51, 70, 0.06) 0px 3px 3px -1.5px, rgba(42, 51, 70, 0.06) 0px 6px 6px -3px, rgba(14, 63, 126, 0.06) 0px 12px 12px -6px, rgba(14, 63, 126, 0.06) 0px 24px 24px -12px",
+            boxShadow: isQueryingSku
+              ? "rgba(245, 158, 11, 0.16) 0px 0px 0px 2px, rgba(245, 158, 11, 0.1) 0px 8px 24px -4px, rgba(14, 63, 126, 0.06) 0px 12px 12px -6px"
+              : "rgba(14, 63, 126, 0.06) 0px 0px 0px 1px, rgba(42, 51, 69, 0.06) 0px 1px 1px -0.5px, rgba(42, 51, 70, 0.06) 0px 3px 3px -1.5px, rgba(42, 51, 70, 0.06) 0px 6px 6px -3px, rgba(14, 63, 126, 0.06) 0px 12px 12px -6px, rgba(14, 63, 126, 0.06) 0px 24px 24px -12px",
           }}
         >
+          {/* Subtle scanning light beam on top border during SKU lookup */}
+          {isQueryingSku && (
+            <div className="absolute top-0 left-0 right-0 h-1 overflow-hidden rounded-t-3xl bg-amber-500/10 z-20">
+              <div className="h-full w-2/5 bg-gradient-to-r from-transparent via-amber-500 to-transparent sku-searching-scanner" />
+            </div>
+          )}
+
+          {/* Real-time SKU search feedback banner */}
+          {isQueryingSku && (
+            <div
+              className="flex items-center justify-between gap-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-50/95 via-orange-50/80 to-amber-50/95 border border-amber-200/90 text-amber-950 text-xs shadow-xs animate-in fade-in slide-in-from-top-1 duration-200"
+              dir="rtl"
+            >
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                </span>
+                <span className="font-semibold text-amber-950">
+                  {activeSku
+                    ? `מאתרת נתונים ותמונה עבור מק"ט ${activeSku} במקור הנתונים...`
+                    : "מבצעת שאילתת מק\"ט במקור הנתונים (מילון לוגיסטי)..."}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] font-medium text-amber-800">
+                <Loader2 className="w-3 h-3 animate-spin text-amber-600" />
+                <span className="hidden sm:inline">גיליון מילון_לוגיסטי</span>
+              </div>
+            </div>
+          )}
+
+          {/* Subtle preview indicator while typing an SKU */}
+          {!isQueryingSku && previewSku && (
+            <div
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-stone-100/90 border border-stone-200/80 text-stone-600 text-xs w-fit animate-in fade-in duration-150"
+              dir="rtl"
+            >
+              <Search className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span>
+                זוהה מק&quot;ט <strong className="text-amber-700 font-semibold">{previewSku}</strong> — בלחיצה על שלח תתבצע שאילתה במקור הנתונים
+              </span>
+            </div>
+          )}
+
           <div className="flex gap-2 items-center">
             {uploadedImage && (
               <div className={cn("relative shrink-0", showImageBounce && "image-bounce")}>
@@ -435,11 +516,13 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
               }}
               onKeyDown={handleKeyDown}
               placeholder={
-                isRecording
-                  ? "מקשיבה לך ראמי... (דבר בחופשיות)"
-                  : isTranscribing
-                    ? "מתמללת את ההקלטה שלך לנועה..."
-                    : "כתוב הודעה לנועה... (Shift+Enter לשורה חדשה)"
+                isQueryingSku
+                  ? `שולפת נתונים ותמונה עבור מק"ט ${activeSku || ""} ממקור הנתונים...`
+                  : isRecording
+                    ? "מקשיבה לך ראמי... (דבר בחופשיות)"
+                    : isTranscribing
+                      ? "מתמללת את ההקלטה שלך לנועה..."
+                      : "כתוב הודעה לנועה... (Shift+Enter לשורה חדשה)"
               }
               disabled={isStreaming || disabled}
               rows={1}
@@ -448,6 +531,7 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
                 "flex-1 resize-none bg-transparent px-3.5 py-2.5 text-sm text-stone-800 placeholder:text-stone-400 text-right",
                 "focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed",
                 "min-h-[56px] max-h-[220px] border border-stone-200/80 rounded-2xl overflow-y-auto transition-[height] duration-150 ease-out",
+                isQueryingSku && "border-amber-400/70 bg-amber-50/20"
               )}
               style={{
                 minHeight: "56px",

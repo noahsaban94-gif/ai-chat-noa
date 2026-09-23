@@ -430,3 +430,25 @@ export function clearProductDataCache(): void {
   cachedProducts.clear()
   lastCacheTimestamp = 0
 }
+
+/**
+ * Extracts a candidate SKU number or code from user text (e.g., "10002", "11501", "מק\"ט 11511").
+ */
+export function extractSkuFromText(text: string): string | null {
+  if (!text) return null
+  const cleaned = text.trim()
+
+  // 1. Explicit pattern: מק"ט / מקט / מק״ט / sku / מוצר followed by digits
+  const explicitMatch = cleaned.match(/(?:מק["״]?ט|מקט|sku|פריט|מוצר)\s*[:#-]?\s*(\d{4,7})/i)
+  if (explicitMatch && explicitMatch[1]) {
+    return explicitMatch[1]
+  }
+
+  // 2. Standalone or delimited 4-7 digit number
+  const digitMatch = cleaned.match(/\b(1\d{4,5}|6\d{4}|[1-9]\d{3,6})\b/)
+  if (digitMatch && digitMatch[1]) {
+    return digitMatch[1]
+  }
+
+  return null
+}

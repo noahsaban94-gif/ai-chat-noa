@@ -36,6 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { extractSkuFromText } from "@/lib/product-data-service"
 
 // Data model for messages
 export interface Message {
@@ -94,6 +95,10 @@ export function ChatShell() {
     stop: stopSpeech,
     toggleAutoSpeak,
   } = useSpeech()
+
+  // Real-time SKU lookup visual feedback state
+  const [isSkuSearching, setIsSkuSearching] = useState(false)
+  const [searchingSku, setSearchingSku] = useState<string | null>(null)
 
   // Track streaming finish to trigger auto-speak if enabled
   const wasStreamingRef = useRef(false)
@@ -251,6 +256,18 @@ export function ChatShell() {
         createdAt: new Date(),
       }
 
+      // Check if this user query triggers a SKU lookup
+      const detectedSku = extractSkuFromText(content)
+      const isSkuQuery = Boolean(
+        detectedSku ||
+        /(?:מק["״]?ט|מקט|sku|תמונת מוצר|תמונה של|מילון לוגיסטי)/i.test(content)
+      )
+
+      if (isSkuQuery) {
+        setIsSkuSearching(true)
+        setSearchingSku(detectedSku)
+      }
+
       const newMessages = [...messages, userMessage, assistantMessage]
       setMessages(newMessages)
       setIsStreaming(true)
@@ -349,6 +366,9 @@ export function ChatShell() {
 
           if (done) break
 
+          // First incoming chunk indicates data source query has responded
+          setIsSkuSearching(false)
+
           const chunk = decoder.decode(value, { stream: true })
           accumulatedContent += chunk
 
@@ -377,6 +397,8 @@ export function ChatShell() {
         }
       } finally {
         setIsStreaming(false)
+        setIsSkuSearching(false)
+        setSearchingSku(null)
         setAbortController(null)
       }
     },
@@ -395,6 +417,8 @@ export function ChatShell() {
   }, [messages, sendMessage])
 
   const stopStreaming = useCallback(() => {
+    setIsSkuSearching(false)
+    setSearchingSku(null)
     if (abortController) {
       abortController.abort()
     }
@@ -614,6 +638,8 @@ export function ChatShell() {
         disabled={!!error}
         selectedModel={selectedModel}
         onModelChange={handleModelChange}
+        isSkuSearching={isSkuSearching}
+        searchingSku={searchingSku}
       />
 
       <OfflineIndicator />
