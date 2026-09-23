@@ -37,21 +37,354 @@ function getGenAI(): GoogleGenAI {
   return aiClient
 }
 
-const STATIC_LOGISTICS_CATALOG = [
-  { sku: "11501", officialName: "בלה חול מחצבה נקי", category: "תפזורת בלות", defaultWarehouse: "סניף 4 החרש", requiresBelaDeposit: true, requiresPalletDeposit: false, aliases: ["בלה חול", "בלות חול", "חול", "שק חול", "רמל"] },
-  { sku: "11502", officialName: "בלה סומסום (מצע תשתית וריצוף)", category: "תפזורת בלות", defaultWarehouse: "סניף 4 החרש", requiresBelaDeposit: true, requiresPalletDeposit: false, aliases: ["בלה סומסום", "סומסום", "סמסם", "מצע"] },
-  { sku: "11503", officialName: "בלה טיט מוכן לבנייה", category: "תפזורת בלות", defaultWarehouse: "סניף 4 החרש", requiresBelaDeposit: true, requiresPalletDeposit: false, aliases: ["טיט", "טיט מוכן", "בלה טיט", "טיין"] },
-  { sku: "10002", officialName: "מלט אפור נשר 25 ק\"ג (40 שק במשטח = 1,000 ק\"ג)", category: "מלט וקשירה", defaultWarehouse: "סניף 4 החרש", requiresBelaDeposit: false, requiresPalletDeposit: true, aliases: ["מלט", "שק מלט", "מלט אפור", "נשר", "מלט 25", "אסמנת"] },
-  { sku: "60002", officialName: "פקדון שק גדול (בלה ריקה)", category: "פקדונות אריזה", defaultWarehouse: "סניף 4 החרש", requiresBelaDeposit: false, requiresPalletDeposit: false, aliases: ["פקדון בלה", "שק גדול", "שוואל", "שואיל"] },
-  { sku: "60060", officialName: "משטח עץ סבן תקני פקדון", category: "פקדונות אריזה", defaultWarehouse: "סניף 4 החרש", requiresBelaDeposit: false, requiresPalletDeposit: false, aliases: ["משטח סבן", "פקדון משטח", "משטח עץ"] },
-  { sku: "111260", officialName: "לוח גבס לבן 2.60 מטר תקני", category: "גבס ופרופילים", defaultWarehouse: "סניף 1 התלמיד", requiresBelaDeposit: false, requiresPalletDeposit: false, aliases: ["גבס לבן", "לוח גבס", "גבס 2.60"] },
-  { sku: "111261", officialName: "לוח גבס ירוק עמיד לחות 2.60 מטר", category: "גבס ופרופילים", defaultWarehouse: "סניף 1 התלמיד", requiresBelaDeposit: false, requiresPalletDeposit: false, aliases: ["גבס ירוק", "עמיד לחות", "ירוק 2.60"] },
-  { sku: "120116", officialName: "דבק קרמיקה מיסטר פיקס 116 (25 ק\"ג)", category: "דבקים וחומרי מליטה", defaultWarehouse: "סניף 4 החרש", requiresBelaDeposit: false, requiresPalletDeposit: true, aliases: ["דבק 116", "מיסטר פיקס 116", "פיקס 116"] },
-  { sku: "120109", officialName: "דבק קרמיקה שרפון 109 (25 ק\"ג)", category: "דבקים וחומרי מליטה", defaultWarehouse: "סניף 4 החרש", requiresBelaDeposit: false, requiresPalletDeposit: true, aliases: ["שרפון 109", "דבק 109"] },
-  { sku: "130107", officialName: "סיקה טופ סיל 107 (איטום צמנטי)", category: "איטום ובידוד", defaultWarehouse: "סניף 4 החרש", requiresBelaDeposit: false, requiresPalletDeposit: false, aliases: ["סיקה", "סיקה 107", "טופ סיל 107"] },
-  { sku: "140020", officialName: "בלוק שחור תקני 20 (תעשיות בלוקים)", category: "בלוקים", defaultWarehouse: "סניף 4 החרש", requiresBelaDeposit: false, requiresPalletDeposit: true, aliases: ["בלוק 20", "בלוק שחור", "בלוקים"] },
-]
+export const STATIC_LOGISTICS_CATALOG = [
+  // --- אגרגטים ותפזורת בלות ---
+  {
+    sku: "11501",
+    officialName: "חול שק גדול (בלה חול ~750 ק״ג)",
+    category: "אגרגטים וחומרי מחצבה",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: true,
+    requiresPalletDeposit: false,
+    aliases: ["בלה חול", "בלות חול", "חול בלה", "שק חול גדול", "רמל בלה", "חול ים"]
+  },
+  {
+    sku: "11511",
+    officialName: "סומסום שק גדול (בלה סומסום נקי ~730 ק״ג)",
+    category: "אגרגטים וחומרי מחצבה",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: true,
+    requiresPalletDeposit: false,
+    aliases: ["בלה סומסום", "סומסום בלה", "סמסם", "מצע לריצוף", "חצץ דק לריצוף"]
+  },
+  {
+    sku: "11551",
+    officialName: "טיט מוכן שק גדול (בלה טיט לבנייה וטיח ~700 ק״ג)",
+    category: "אגרגטים וחומרי מחצבה",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: true,
+    requiresPalletDeposit: false,
+    aliases: ["בלה טיט", "טיט בלה", "טיט מוכן לבנייה", "טיין בלה"]
+  },
+  {
+    sku: "11506",
+    officialName: "חצץ שק גדול (בלה חצץ מדורג שטוף ונקי ~700 ק״ג)",
+    category: "אגרגטים וחומרי מחצבה",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: true,
+    requiresPalletDeposit: false,
+    aliases: ["בלה חצץ", "חצץ בלה", "חצץ מדורג", "חצץ ליציקות"]
+  },
+  {
+    sku: "11540",
+    officialName: "מצע שק גדול (בלה מצע מהודק מדורג סוג א׳ לתשתיות ~700 ק״ג)",
+    category: "אגרגטים וחומרי מחצבה",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: true,
+    requiresPalletDeposit: false,
+    aliases: ["בלה מצע", "מצע סוג א", "מצע מהודק", "מצע מעצ"]
+  },
+  {
+    sku: "11570",
+    officialName: "חמרה שק גדול (בלה אדמת חמרה אדומה נקייה לגינון ופיתוח ~700 ק״ג)",
+    category: "אגרגטים וחומרי מחצבה",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: true,
+    requiresPalletDeposit: false,
+    aliases: ["בלה חמרה", "אדמת חמרה", "חמרה אדומה", "אדמה לגינה"]
+  },
+  {
+    sku: "11521",
+    officialName: "שליכט שק גדול (בלה חול שליכט מחצבה שטוף לשכבת גמר ~700 ק״ג)",
+    category: "אגרגטים וחומרי מחצבה",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: true,
+    requiresPalletDeposit: false,
+    aliases: ["בלה שליכט", "שליכט בלה", "חול שליכט", "חול טיח גמר"]
+  },
 
+  // --- שקים בודדים (25 ק"ג) ואגרגטים ---
+  {
+    sku: "10002",
+    officialName: "מלט אפור 25 ק״ג נשר (CEM II 42.5 N/B-LL)",
+    category: "חומרי מליטה וצמנט",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: true,
+    aliases: ["מלט אפור", "מלט נשר", "שק מלט", "מלט 25 קג", "אסמנת", "צמנט אפור"]
+  },
+  {
+    sku: "10001",
+    officialName: "מלט לבן 25 ק״ג נשר (CEM II 42.5 N או CEM I 52.5 R)",
+    category: "חומרי מליטה וצמנט",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: true,
+    aliases: ["מלט לבן", "צמנט לבן", "נשר לבן", "מלט לבן 25"]
+  },
+  {
+    sku: "10011",
+    officialName: "בטון מוכן 25 ק״ג תרמוקיר (בטון 30 MO 011)",
+    category: "חומרי מליטה וצמנט",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: true,
+    aliases: ["בטון מוכן", "בטון יבש", "בטון 30", "תרמוקיר בטון", "MO 011"]
+  },
+  {
+    sku: "11500",
+    officialName: "חול שק 25 ק״ג (חול ים שטוף ומסונן לבנייה)",
+    category: "אגרגטים וחומרי מחצבה",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: true,
+    aliases: ["שק חול", "חול 25 קג", "חול שטוף", "שק רמל"]
+  },
+  {
+    sku: "11510",
+    officialName: "סומסום שק 25 ק״ג (מצע חצץ דק נקי ומדורג לריצוף)",
+    category: "אגרגטים וחומרי מחצבה",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: true,
+    aliases: ["שק סומסום", "סומסום 25 קג", "סומסום שק", "חצץ דק"]
+  },
+  {
+    sku: "11550",
+    officialName: "טיט מוכן שק 25 ק״ג (תערובת טיט יבשה לבנייה וטיח)",
+    category: "אגרגטים וחומרי מחצבה",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: true,
+    aliases: ["שק טיט", "טיט 25 קג", "טיט מוכן", "טיט לבנייה"]
+  },
+  {
+    sku: "11505",
+    officialName: "חצץ שק 25 ק״ג (חצץ מדורג שטוף ונקי לבטון ותשתיות)",
+    category: "אגרגטים וחומרי מחצבה",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: true,
+    aliases: ["שק חצץ", "חצץ 25 קג", "חצץ בטון"]
+  },
+
+  // --- דבקים, טיט ואיטום צמנטי ---
+  {
+    sku: "19255",
+    officialName: "סיקה סרם 255 סטארפלקס (SikaCeram-255)",
+    category: "דבקים ואיטום",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: true,
+    aliases: ["סיקה סרם 255", "סיקה 255", "סטארפלקס", "דבק קרמיקה סיקה"]
+  },
+  {
+    sku: "10701",
+    officialName: "סיקה טופ 107 (SikaTop Seal-107)",
+    category: "חומרי איטום צמנטיים",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: true,
+    aliases: ["סיקה 107", "סיקה טופ 107", "ערכת סיקה 107", "איטום חדרים רטובים"]
+  },
+  {
+    sku: "10702",
+    officialName: "סיקה לטקס SBR (SikaLatex SBR)",
+    category: "מוספים ודבקים לטיח",
+    defaultWarehouse: "סניף 1 התלמיד",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: false,
+    aliases: ["סיקה לטקס", "לטקס SBR", "ביג בונד", "דבק מוסף לרולקות", "לטקס 5 ליטר"]
+  },
+  {
+    sku: "15181",
+    officialName: "טיט לריצוף 181 כרמית מיסטר פיקס 25 ק״ג (ריצופית)",
+    category: "דבקים וטיט לריצוף",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: true,
+    aliases: ["טיט לריצוף 181", "מיסטר פיקס 181", "ריצופית", "טיט 181", "כרמית 181"]
+  },
+  {
+    sku: "14603",
+    officialName: "דבק פלסטומר AD 603 אפור 25 ק״ג מותג :תרמוקיר",
+    category: "דבקים ומליטה",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: true,
+    aliases: ["תרמוקיר 603", "AD 603", "פלסטומר 603", "דבק קרמיקה תרמוקיר"]
+  },
+  {
+    sku: "14075",
+    officialName: "טיח גבס MP75 שק 25 ק״ג קנאוף (Knauf MP75)",
+    category: "טיח וגמר פנים",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: true,
+    aliases: ["טיח גבס", "MP75", "קנאוף MP75", "טיח מכונה", "טיח פנים"]
+  },
+  {
+    sku: "14104",
+    officialName: "טיח חוץ מיישר סופר PL 102s תרמוקיר 25 ק״ג (טיח בריכות וסביבה ימית)",
+    category: "טייחים ואיטום",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: true,
+    aliases: ["תרמוקיר PL 102s", "PL 102s", "טיח בריכות", "טיח מיישר חוץ"]
+  },
+  {
+    sku: "15770",
+    officialName: "טיח ממ״ד 770 כרמית מיסטר פיקס 25 ק״ג (טיח צמנטי רב-תכליתי למרחבים מוגנים)",
+    category: "טייחים ומרחבים מוגנים",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: true,
+    aliases: ["טיח ממד", "מיסטר פיקס 770", "טיח 770", "טיח למקלטים"]
+  },
+  {
+    sku: "14400",
+    officialName: "טיח תרמי 400 תרמוקיר 23 ק״ג (75 ליטר) Termokir TH 400",
+    category: "טיח ובידוד תרמי",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: true,
+    aliases: ["טיח תרמי 400", "תרמוקיר TH 400", "טיח תרמי", "TH 400"]
+  },
+
+  // --- איטום גגות, שפכטלים ודבקים מיוחדים ---
+  {
+    sku: "20110",
+    officialName: "טמבור סופרפלקס לבן (טמבור פח 18 ליטר)",
+    category: "איטום גגות וציפויים",
+    defaultWarehouse: "סניף 1 התלמיד",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: true,
+    aliases: ["סופרפלקס לבן", "סופרפלקס טמבור", "איטום גגות לבן", "פח סופרפלקס"]
+  },
+  {
+    sku: "15090",
+    officialName: "רוקבונד שפכטל אמריקאי מוכן 28 ק״ג (Rockbond)",
+    category: "שפכטלים וגמר פנים",
+    defaultWarehouse: "סניף 1 התלמיד",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: true,
+    aliases: ["רוקבונד", "שפכטל אמריקאי מוכן", "שפכטל דלי", "שפכטל רוקבונד 28"]
+  },
+  {
+    sku: "15453",
+    officialName: "סופר 7 שקוף 290 מ״ל Bostik Super 7",
+    category: "דבקים ואיטום",
+    defaultWarehouse: "סניף 1 התלמיד",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: false,
+    aliases: ["סופר 7", "סופר 7 שקוף", "סופר שבע", "Super 7", "בוסטיק שקוף", "דבק MS"]
+  },
+  {
+    sku: "15680",
+    officialName: "סיקפלקס FC11 תרמיל 300 מ״ל SIKA (Sikaflex-11 FC Purform)",
+    category: "איטום והדבקה גמישה",
+    defaultWarehouse: "סניף 1 התלמיד",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: false,
+    aliases: ["סיקפלקס", "סיקפלקס 11", "FC11", "מסטיק פוליאוריטן סיקה"]
+  },
+  {
+    sku: "30501",
+    officialName: "קצף פוליאוריטן סיקה בום (Sika Boom-157)",
+    category: "קצף ואיטום מרווחים",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: false,
+    aliases: ["סיקה בום", "קצף פוליאוריטן", "פוליאוריטן מוקצף", "ספריי קצף"]
+  },
+
+  // --- לוחות גבס ---
+  {
+    sku: "111260",
+    officialName: "לוח גבס לבן 260 ע׳ 12.50 מ״מ אורבונד / טמבור",
+    category: "לוחות גבס ומחיצות",
+    defaultWarehouse: "סניף 1 התלמיד",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: false,
+    aliases: ["גבס לבן 2.60", "לוח גבס לבן 260", "לוח גבס רגיל", "גבס 260"]
+  },
+  {
+    sku: "112260",
+    officialName: "לוח גבס ירוק 260 עמידות מוגברת בלחות (עובי 12.5 מ״מ)",
+    category: "לוחות גבס ומחיצות",
+    defaultWarehouse: "סניף 1 התלמיד",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: false,
+    aliases: ["גבס ירוק 2.60", "לוח גבס ירוק 260", "גבס עמיד לחות", "ירוק 2.60", "גבס למקלחות"]
+  },
+  {
+    sku: "111200",
+    officialName: "לוח גבס לבן 200 ע׳ 12.50 מ״מ אורבונד / טמבור",
+    category: "לוחות גבס ומחיצות",
+    defaultWarehouse: "סניף 1 התלמיד",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: false,
+    aliases: ["גבס לבן 2 מטר", "לוח גבס 2.00", "גבס לבן 200"]
+  },
+  {
+    sku: "112200",
+    officialName: "לוח גבס ירוק 200 ע׳ 12.50 מ״מ אורבונד / טמבור",
+    category: "לוחות גבס ומחיצות",
+    defaultWarehouse: "סניף 1 התלמיד",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: false,
+    aliases: ["גבס ירוק 2 מטר", "לוח גבס ירוק 200", "ירוק 2 מטר"]
+  },
+  {
+    sku: "113260",
+    officialName: "לוח גבס ורוד 260 ע׳ 12.50 מ״מ (מעכב בעירה FR)",
+    category: "לוחות גבס ומחיצות",
+    defaultWarehouse: "סניף 1 התלמיד",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: false,
+    aliases: ["גבס ורוד", "גבס אדום", "גבס חסין אש", "לוח גבס ורוד 260", "גבס מעכב בעירה"]
+  },
+  {
+    sku: "114260",
+    officialName: "לוח גבס כחול 260 ע׳ 12.50 מ״מ (עמיד מים, אש וקול)",
+    category: "לוחות גבס ומחיצות",
+    defaultWarehouse: "סניף 1 התלמיד",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: false,
+    aliases: ["גבס כחול", "לוח גבס כחול", "גבס אקוסטי כחול", "לוח כחול 260"]
+  },
+
+  // --- בלוקים ---
+  {
+    sku: "10020",
+    officialName: "בלוק בטון חלול תקני 20 ס״מ",
+    category: "בלוקים ומחיצות",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: true,
+    aliases: ["בלוק 20", "בלוק בטון 20", "בלוק שחור 20", "בלוקים 20"]
+  },
+
+  // --- פקדונות לוגיסטיים ---
+  {
+    sku: "60002",
+    officialName: "פקדון שק גדול (בלה ריקה)",
+    category: "פקדונות אריזה",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: false,
+    aliases: ["פקדון בלה", "שק גדול פקדון", "שוואל", "שואיל", "פקדון שק"]
+  },
+  {
+    sku: "60060",
+    officialName: "משטח עץ סבן תקני פקדון",
+    category: "פקדונות אריזה",
+    defaultWarehouse: "סניף 4 החרש",
+    requiresBelaDeposit: false,
+    requiresPalletDeposit: false,
+    aliases: ["משטח סבן", "פקדון משטח", "משטח עץ", "פקדון משטח 60060"]
+  }
+];
 /**
  * 1. שליפת הזמנות עבר מתוך קולקציית orders ב-Firestore עם גיבוי מקומי
  */
