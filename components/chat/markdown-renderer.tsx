@@ -195,13 +195,73 @@ export function MarkdownRenderer({
     return ""
   }
 
+  // Sanitize and strip document-level elements (doctype, html, head, body, meta, title, link, script, style)
+  // so that React does not attempt to mount <html> or <body> inside a component tree
+  const cleanHtmlForParser = (raw: string): string => {
+    if (!raw) return ""
+
+    let cleaned = raw
+      // Strip doctype (including unclosed/partial at end)
+      .replace(/<!DOCTYPE[^>]*>?/gi, "")
+      // Strip HTML comments
+      .replace(/<!--[\s\S]*?-->/g, "")
+      // Strip scripts and styles and their contents
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
+
+    // If there is an explicit <body>...</body> tag, extract its contents
+    const bodyMatch = cleaned.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i)
+    if (bodyMatch) {
+      cleaned = bodyMatch[1]
+    } else {
+      // Otherwise strip <head>...</head> block
+      cleaned = cleaned.replace(/<head\b[^<]*(?:(?!<\/head>)<[^<]*)*<\/head>/gi, "")
+    }
+
+    // Strip residual document tags
+    cleaned = cleaned
+      .replace(/<\/?(?:html|body|head)\b[^>]*>?/gi, "")
+      .replace(/<(?:meta|link|title|base)\b[^>]*\/?>/gi, "")
+      .replace(/<\/title>/gi, "")
+
+    return cleaned.trim()
+  }
+
   // HTML parser options with Tailwind styling and interactive buttons
   const parseOptions: HTMLReactParserOptions = {
     replace(domNode) {
+      if ((domNode as any).type === "directive" || (domNode as any).type === "comment") {
+        return <></>
+      }
+
       if (domNode instanceof Element) {
+        const tag = domNode.name.toLowerCase()
+
+        // Document-level tags: NEVER render <html> or <body> directly in React component tree!
+        if (tag === "html" || tag === "body") {
+          return (
+            <div className="w-full my-1">
+              {domToReact(domNode.children as DOMNode[], parseOptions)}
+            </div>
+          )
+        }
+
+        // Head and document metadata elements should never be rendered in message bubble
+        if (
+          tag === "head" ||
+          tag === "meta" ||
+          tag === "title" ||
+          tag === "link" ||
+          tag === "script" ||
+          tag === "style" ||
+          tag.startsWith("!")
+        ) {
+          return <></>
+        }
+
         // Interactive Quick Chip Button
-        if (domNode.name === "button") {
-          const rawClass = domNode.attribs.class || domNode.attribs.className || ""
+        if (tag === "button") {
+          const rawClass = domNode.attribs?.class || domNode.attribs?.className || ""
           const buttonText = getDomNodeText(domNode).trim()
 
           return (
@@ -225,64 +285,64 @@ export function MarkdownRenderer({
         }
 
         // Table container and elements
-        if (domNode.name === "table") {
+        if (tag === "table") {
           return (
             <div className="overflow-x-auto my-3 rounded-xl border border-slate-200/90 shadow-xs bg-white" dir="rtl">
-              <table className={cn("w-full text-right text-xs divide-y divide-slate-200", domNode.attribs.class, domNode.attribs.className)}>
+              <table className={cn("w-full text-right text-xs divide-y divide-slate-200", domNode.attribs?.class, domNode.attribs?.className)}>
                 {domToReact(domNode.children as DOMNode[], parseOptions)}
               </table>
             </div>
           )
         }
 
-        if (domNode.name === "thead") {
+        if (tag === "thead") {
           return (
-            <thead className={cn("bg-slate-100/90 text-slate-800 font-extrabold border-b border-slate-200", domNode.attribs.class, domNode.attribs.className)}>
+            <thead className={cn("bg-slate-100/90 text-slate-800 font-extrabold border-b border-slate-200", domNode.attribs?.class, domNode.attribs?.className)}>
               {domToReact(domNode.children as DOMNode[], parseOptions)}
             </thead>
           )
         }
 
-        if (domNode.name === "tbody") {
+        if (tag === "tbody") {
           return (
-            <tbody className={cn("divide-y divide-slate-100 font-medium bg-white", domNode.attribs.class, domNode.attribs.className)}>
+            <tbody className={cn("divide-y divide-slate-100 font-medium bg-white", domNode.attribs?.class, domNode.attribs?.className)}>
               {domToReact(domNode.children as DOMNode[], parseOptions)}
             </tbody>
           )
         }
 
-        if (domNode.name === "tr") {
+        if (tag === "tr") {
           return (
-            <tr className={cn("hover:bg-sky-50/40 transition-colors", domNode.attribs.class, domNode.attribs.className)}>
+            <tr className={cn("hover:bg-sky-50/40 transition-colors", domNode.attribs?.class, domNode.attribs?.className)}>
               {domToReact(domNode.children as DOMNode[], parseOptions)}
             </tr>
           )
         }
 
-        if (domNode.name === "th") {
+        if (tag === "th") {
           return (
-            <th className={cn("p-2.5 whitespace-nowrap font-extrabold text-slate-800 text-right text-xs", domNode.attribs.class, domNode.attribs.className)}>
+            <th className={cn("p-2.5 whitespace-nowrap font-extrabold text-slate-800 text-right text-xs", domNode.attribs?.class, domNode.attribs?.className)}>
               {domToReact(domNode.children as DOMNode[], parseOptions)}
             </th>
           )
         }
 
-        if (domNode.name === "td") {
+        if (tag === "td") {
           return (
-            <td className={cn("p-2.5 whitespace-nowrap text-slate-700 text-right text-xs", domNode.attribs.class, domNode.attribs.className)}>
+            <td className={cn("p-2.5 whitespace-nowrap text-slate-700 text-right text-xs", domNode.attribs?.class, domNode.attribs?.className)}>
               {domToReact(domNode.children as DOMNode[], parseOptions)}
             </td>
           )
         }
 
-        if (domNode.name === "img") {
-          const src = domNode.attribs.src || ""
-          const alt = domNode.attribs.alt || "תמונת מוצר סבן"
-          return <ProductChatImage key={domNode.attribs.key || src} src={src} alt={alt} />
+        if (tag === "img") {
+          const src = domNode.attribs?.src || ""
+          const alt = domNode.attribs?.alt || "תמונת מוצר סבן"
+          return <ProductChatImage key={domNode.attribs?.key || src} src={src} alt={alt} />
         }
 
         // Heading support
-        if (/^h[1-6]$/.test(domNode.name)) {
+        if (/^h[1-6]$/.test(tag)) {
           return (
             <div className="font-bold text-slate-800 text-sm sm:text-base my-2 flex items-center gap-1.5 border-r-2 border-emerald-500 pr-2 py-0.5 bg-slate-50/70 rounded-l" dir="rtl">
               {domToReact(domNode.children as DOMNode[], parseOptions)}
@@ -291,12 +351,12 @@ export function MarkdownRenderer({
         }
 
         // Horizontal Rule
-        if (domNode.name === "hr") {
+        if (tag === "hr") {
           return <div className="my-2.5 border-t border-slate-200/80 w-full" />
         }
 
         // Paragraph
-        if (domNode.name === "p") {
+        if (tag === "p") {
           return (
             <p className="my-1 leading-relaxed text-slate-700 text-xs sm:text-sm" dir="rtl">
               {domToReact(domNode.children as DOMNode[], parseOptions)}
@@ -305,27 +365,27 @@ export function MarkdownRenderer({
         }
 
         // Ordered List
-        if (domNode.name === "ol") {
+        if (tag === "ol") {
           return (
-            <ol className={cn("list-decimal list-inside space-y-1.5 my-2 pr-2 font-medium text-slate-700 text-xs sm:text-sm", domNode.attribs.class, domNode.attribs.className)}>
+            <ol className={cn("list-decimal list-inside space-y-1.5 my-2 pr-2 font-medium text-slate-700 text-xs sm:text-sm", domNode.attribs?.class, domNode.attribs?.className)}>
               {domToReact(domNode.children as DOMNode[], parseOptions)}
             </ol>
           )
         }
 
         // Unordered List
-        if (domNode.name === "ul") {
+        if (tag === "ul") {
           return (
-            <ul className={cn("list-disc list-inside space-y-1.5 my-2 pr-2 font-medium text-slate-700 text-xs sm:text-sm", domNode.attribs.class, domNode.attribs.className)}>
+            <ul className={cn("list-disc list-inside space-y-1.5 my-2 pr-2 font-medium text-slate-700 text-xs sm:text-sm", domNode.attribs?.class, domNode.attribs?.className)}>
               {domToReact(domNode.children as DOMNode[], parseOptions)}
             </ul>
           )
         }
 
         // Quick chips container
-        if (domNode.attribs.class?.includes("quick-chips") || domNode.attribs.className?.includes("quick-chips")) {
+        if (domNode.attribs?.class?.includes("quick-chips") || domNode.attribs?.className?.includes("quick-chips")) {
           return (
-            <div className={cn("quick-chips flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-200/80", domNode.attribs.class, domNode.attribs.className)} dir="rtl">
+            <div className={cn("quick-chips flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-200/80", domNode.attribs?.class, domNode.attribs?.className)} dir="rtl">
               {domToReact(domNode.children as DOMNode[], parseOptions)}
             </div>
           )
@@ -336,7 +396,7 @@ export function MarkdownRenderer({
 
   // Check if string contains HTML tags
   const hasHtml = (str: string) => {
-    return /<\/?(?:div|p|span|table|thead|tbody|tr|th|td|ol|ul|li|button|h[1-6]|strong|em|b|i|br|pre|code|hr|a)\b/i.test(str)
+    return /<\/?(?:!doctype|html|body|head|div|p|span|table|thead|tbody|tr|th|td|ol|ul|li|button|h[1-6]|strong|em|b|i|br|pre|code|hr|a|section|article|main|header|footer)\b/i.test(str)
   }
 
   const renderPlainInlineMarkdown = (text: string) => {
@@ -815,11 +875,16 @@ export function MarkdownRenderer({
       // Check for HTML content
       if (hasHtml(part)) {
         try {
+          const sanitizedHtml = cleanHtmlForParser(part)
           // Pre-convert simple inline markdown bold/italic and markdown images if mixed inside HTML
-          const processedHtml = part
+          const processedHtml = sanitizedHtml
             .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" />')
             .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
             .replace(/(^|[^*])\*([^*]+)\*([^*]|$)/g, "$1<em>$2</em>$3")
+
+          if (!processedHtml.trim()) {
+            return null
+          }
 
           return (
             <div key={partIndex} className="my-1.5 whitespace-normal break-words leading-relaxed html-rendered-content" dir="rtl">
