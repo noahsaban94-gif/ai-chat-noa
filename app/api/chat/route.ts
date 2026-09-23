@@ -792,9 +792,12 @@ export async function POST(req: Request) {
       }
     }
 
-    if (!process.env.GEMINI_API_KEY) {
+    // בדיקת קיום מפתח API כלשהו בסביבת השרת (Gemini / OpenAI / Anthropic)
+    const hasKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY
+
+    if (!hasKey) {
       return new Response(
-        "Please provide a GEMINI_API_KEY in your environment to chat with the AI assistant.",
+        "לא נמצא מפתח API מוגדר בסביבת השרת. יש להגדיר GEMINI_API_KEY, OPENAI_API_KEY או ANTHROPIC_API_KEY.",
         {
           status: 200,
           headers: { "Content-Type": "text/plain; charset=utf-8" },
@@ -1269,60 +1272,69 @@ ${matchedClientPrompt}
 
 כתבי תמיד בעברית טבעית ורהוטה, פני לראמי בשמו, ושמרי על מחויבות עמוקה להצלחת סבן חומרי בניין.`
 
-    const ai = getGenAI()
-
-    const modelsToTry = ["gemini-3.6-flash", "gemini-2.5-flash"]
     let responseStream = null
     let lastStreamError: unknown = null
 
-    for (const modelName of modelsToTry) {
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          responseStream = await ai.models.generateContentStream({
-            model: modelName,
-            contents,
-            config: {
-              systemInstruction,
-            },
-          })
-          if (responseStream) break
-        } catch (err: unknown) {
-          lastStreamError = err
-          const errMsg = err instanceof Error ? err.message : String(err)
-          const isUnavailable = errMsg.includes("503") || errMsg.includes("UNAVAILABLE")
-          if (isUnavailable && attempt === 0) {
-            await new Promise((resolve) => setTimeout(resolve, 600))
-            continue
+    // 1. ניסיון קריאה ב-Gemini (אם מוגדר מפתח GEMINI_API_KEY)
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const ai = getGenAI()
+        const modelsToTry = ["gemini-3.6-flash", "gemini-2.5-flash"]
+
+        for (const modelName of modelsToTry) {
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              responseStream = await ai.models.generateContentStream({
+                model: modelName,
+                contents,
+                config: {
+                  systemInstruction,
+                },
+              })
+              if (responseStream) break
+            } catch (err: unknown) {
+              lastStreamError = err
+              const errMsg = err instanceof Error ? err.message : String(err)
+              const isUnavailable = errMsg.includes("503") || errMsg.includes("UNAVAILABLE")
+              if (isUnavailable && attempt === 0) {
+                await new Promise((resolve) => setTimeout(resolve, 600))
+                continue
+              }
+              console.warn(`Model ${modelName} stream init failed:`, errMsg)
+              break
+            }
           }
-          console.warn(`Model ${modelName} stream init failed:`, errMsg)
-          break
+          if (responseStream) break
         }
+
+        if (!responseStream) {
+          // ניסיון ישיר ללא streaming ב-Gemini
+          for (const modelName of modelsToTry) {
+            try {
+              const directRes = await ai.models.generateContent({
+                model: modelName,
+                contents,
+                config: { systemInstruction },
+              })
+              if (directRes.text) {
+                return new Response(directRes.text, {
+                  headers: {
+                    "Content-Type": "text/plain; charset=utf-8",
+                    "Cache-Control": "no-cache, no-transform",
+                  },
+                })
+              }
+            } catch (e) {
+              console.warn(`Direct generateContent with ${modelName} failed:`, e)
+            }
+          }
+        }
+      } catch (geminiErr) {
+        console.warn("Gemini client error, moving to multi-provider fallback:", geminiErr)
       }
-      if (responseStream) break
     }
 
     if (!responseStream) {
-      // 1. Try direct non-streaming generateContent
-      for (const modelName of modelsToTry) {
-        try {
-          const directRes = await ai.models.generateContent({
-            model: modelName,
-            contents,
-            config: { systemInstruction },
-          })
-          if (directRes.text) {
-            return new Response(directRes.text, {
-              headers: {
-                "Content-Type": "text/plain; charset=utf-8",
-                "Cache-Control": "no-cache, no-transform",
-              },
-            })
-          }
-        } catch (e) {
-          console.warn(`Direct generateContent with ${modelName} failed:`, e)
-        }
-      }
-
       // 2. Try multi-provider fallback (OpenAI / Anthropic if configured)
       try {
         const fallbackText = await generateMultiProviderFallback(systemInstruction, messages)
@@ -1376,17 +1388,20 @@ ${matchedClientPrompt}
           console.warn("Streaming chunk iteration failed, trying direct fallback:", streamErr)
           if (!fullGeneratedText.trim()) {
             try {
-              const directResponse = await ai.models.generateContent({
-                model: "gemini-3.6-flash",
-                contents,
-                config: {
-                  systemInstruction,
-                },
-              })
-              const directText = directResponse.text || ""
-              if (directText) {
-                fullGeneratedText = directText
-                controller.enqueue(encoder.encode(directText))
+              if (process.env.GEMINI_API_KEY) {
+                const ai = getGenAI()
+                const directResponse = await ai.models.generateContent({
+                  model: "gemini-3.6-flash",
+                  contents,
+                  config: {
+                    systemInstruction,
+                  },
+                })
+                const directText = directResponse.text || ""
+                if (directText) {
+                  fullGeneratedText = directText
+                  controller.enqueue(encoder.encode(directText))
+                }
               }
             } catch (directErr) {
               console.error("Direct fallback failed:", directErr)
