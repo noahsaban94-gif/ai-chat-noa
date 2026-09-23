@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai"
 import { HISTORICAL_63_CLIENTS, findBestClientMatch, searchClients } from "@/lib/historical-clients"
 import { TRAINING_PRODUCTS, findTrainingVideos } from "@/lib/training-videos"
+import { PRODUCT_MEDIA_CATALOG } from "@/lib/product-media"
 import { sendOneSignalPush } from "@/lib/onesignal"
 import { db } from "@/lib/firebase-auth"
 import {
@@ -661,6 +662,25 @@ ${matchedTrainingVideos.slice(0, 2).map((v) => `* **${v.name}**
 }
 `
 
+    const productMediaPrompt = `
+### 🖼️ הנחיות תמונות מוצר ומדיה מקומית (מחייב בכל מענה על מוצרים):
+בכל פעם שאת מציגה פירוט של מוצר מוביל או מסבירה על חומר בניין, צרפי את תמונת המוצר שלו בשורה נפרדת בתחביר Markdown: ![שם המוצר](/products/[SKU].jpg)
+
+מיפוי מק"טים קטלוגיים רשמיים של ח. סבן לתמונות מוצר קיימות:
+- 10002 ⬅️ "מלט אפור 25 ק"ג נשר" ⬅️ ![מלט אפור 25 ק"ג נשר](/products/10002.jpg)
+- 11501 ⬅️ "חול שק גדול (בלה)" ⬅️ ![חול שק גדול (בלה)](/products/11501.jpg)
+- 11511 ⬅️ "סומסום שק גדול (בלה)" ⬅️ ![סומסום שק גדול (בלה)](/products/11511.jpg)
+- 11551 ⬅️ "טיט שק גדול (בלה)" ⬅️ ![טיט שק גדול (בלה)](/products/11551.jpg)
+- 11570 ⬅️ "חמרה שק גדול (בלה)" ⬅️ ![חמרה שק גדול (בלה)](/products/11570.jpg)
+- 12204 ⬅️ "בלוק בטון 20/20/40" ⬅️ ![בלוק בטון 20/20/40](/products/12204.jpg)
+- 111260 ⬅️ "לוח גבס לבן 260" ⬅️ ![לוח גבס לבן 260](/products/111260.jpg)
+- 60002 ⬅️ "שק גדול פקדון (בלה)" ⬅️ ![שק גדול פקדון (בלה)](/products/60002.jpg)
+- 60060 ⬅️ "משטח סבן פקדון" ⬅️ ![משטח סבן פקדון](/products/60060.jpg)
+
+עבור כל חומר בניין אחר שאינו מהרשימה הנ"ל: אם אין מק"ט ספציפי, השתמשי בתמונת ברירת המחדל: ![חומרי בניין סבן](/products/default-building-material.svg)
+מקמי תמיד את תחביר תמונת ה-Markdown בשורה נפרדת לחלוטין עם שורת רווח מעליה ומתחתיה.
+`
+
     const verifiedIdentityBanner = verifiedUser
       ? `
 ### 🔒 זהות משתמש מאומתת (Device Binding מאושר ומאובטח בחומרה):
@@ -690,6 +710,7 @@ ${matchedTrainingVideos.slice(0, 2).map((v) => `* **${v.name}**
 ${verifiedIdentityBanner}
 ${oneSignalStatusNote}
 ${trainingVideosPrompt}
+${productMediaPrompt}
 ${firestoreContextPrompt}
 
 ---

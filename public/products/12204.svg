@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="600" height="450">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B" />
+      <stop offset="100%" stop-color="#0F172A" />
+    </linearGradient>
+    <pattern id="blueprintGrid" width="30" height="30" patternUnits="userSpaceOnUse">
+      <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.05" />
+    </pattern>
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- רקע גרדיאנט ראשי -->
+  <rect width="600" height="450" fill="url(#bgGrad)" />
+  <rect width="600" height="450" fill="url(#blueprintGrid)" />
+
+  <!-- כותרת ראשית ומיתוג חברה -->
+  <g transform="translate(30, 30)">
+    <rect x="0" y="0" width="540" height="45" rx="8" fill="#000000" fill-opacity="0.3" />
+    <text x="20" y="28" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="700" fill="#93C5FD">ח. סבן חומרי בניין (1994) בע״מ</text>
+    <text x="520" y="28" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" fill="#E5E7EB" text-anchor="end">קטלוג לוגיסטי רשמי</text>
+  </g>
+
+  <!-- כרטיס תוכן מרכזי מעוצב -->
+  <g transform="translate(50, 95)" filter="url(#cardShadow)">
+    <rect x="0" y="0" width="500" height="300" rx="16" fill="#111827" fill-opacity="0.7" stroke="#CBD5E1" stroke-width="2" stroke-opacity="0.3"/>
+    
+    <!-- תגית מק"ט עליונה -->
+    <g transform="translate(25, 25)">
+      <rect x="0" y="0" width="130" height="32" rx="16" fill="#334155"/>
+      <text x="65" y="21" font-family="system-ui, sans-serif" font-size="15" font-weight="900" fill="#F8FAFC" text-anchor="middle">מק"ט: 12204</text>
+    </g>
+
+    <!-- קטגוריה -->
+    <g transform="translate(475, 25)">
+      <text x="0" y="21" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#CBD5E1" text-anchor="end">בלוקים</text>
+    </g>
+
+    <!-- אייקון / איור המוצר -->
+    
+      <g transform="translate(225, 115)">
+        <polygon points="10,120 120,120 145,85 35,85" fill="#475569" stroke="#94A3B8" stroke-width="3"/>
+        <polygon points="120,120 145,85 145,45 120,70" fill="#334155" stroke="#94A3B8" stroke-width="3"/>
+        <polygon points="10,120 35,85 35,45 10,70" fill="#334155" stroke="#94A3B8" stroke-width="3"/>
+        <polygon points="10,70 120,70 145,45 35,45" fill="#64748B" stroke="#CBD5E1" stroke-width="3"/>
+        <!-- תאי חלל הבלוק -->
+        <ellipse cx="60" cy="58" rx="14" ry="7" fill="#1E293B"/>
+        <ellipse cx="100" cy="58" rx="14" ry="7" fill="#1E293B"/>
+        <rect x="35" y="85" width="80" height="24" rx="4" fill="#0F172A" opacity="0.75"/>
+        <text x="75" y="101" font-family="system-ui, sans-serif" font-size="12" font-weight="800" fill="#F8FAFC" text-anchor="middle">20/20/40</text>
+      </g>
+    
+
+    <!-- שם מוצר ראשי בעברית -->
+    <text x="250" y="240" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="900" fill="#FFFFFF" text-anchor="middle" direction="rtl">
+      בלוק בטון 20/20/40
+    </text>
+
+    <!-- תיאור משני -->
+    <text x="250" y="268" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="500" fill="#D1D5DB" text-anchor="middle" direction="rtl">
+      בלוק שחור תקני לבנייה | עמידות גבוהה
+    </text>
+  </g>
+
+  <!-- חותמת מקורית בתחתית -->
+  <g transform="translate(30, 415)">
+    <circle cx="10" cy="10" r="4" fill="#10B981"/>
+    <text x="22" y="14" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#9CA3AF">מלאי מנוהל במערכת קומקס ו-ERP סבן</text>
+    <text x="540" y="14" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#CBD5E1" text-anchor="end">נועה AI • שירות לוגיסטי</text>
+  </g>
+</svg>

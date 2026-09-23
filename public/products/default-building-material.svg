@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="600" height="450">
+  <defs>
+    <linearGradient id="defGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B" />
+      <stop offset="100%" stop-color="#0F172A" />
+    </linearGradient>
+  </defs>
+  <rect width="600" height="450" fill="url(#defGrad)" />
+  <rect x="40" y="40" width="520" height="370" rx="16" fill="#111827" fill-opacity="0.8" stroke="#38BDF8" stroke-width="2" stroke-opacity="0.4"/>
+  
+  <g transform="translate(250, 110)">
+    <rect x="0" y="20" width="100" height="90" rx="10" fill="#0284C7" stroke="#38BDF8" stroke-width="3"/>
+    <polygon points="50,0 0,20 100,20" fill="#38BDF8"/>
+    <circle cx="50" cy="65" r="18" fill="#0F172A"/>
+    <path d="M 40 65 L 48 73 L 62 57" stroke="#38BDF8" stroke-width="4" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <text x="300" y="260" font-family="system-ui, sans-serif" font-size="24" font-weight="900" fill="#FFFFFF" text-anchor="middle" direction="rtl">
+    חומרי בניין ומחצבה
+  </text>
+  <text x="300" y="295" font-family="system-ui, sans-serif" font-size="15" font-weight="600" fill="#94A3B8" text-anchor="middle" direction="rtl">
+    ח. סבן חומרי בניין (1994) בע״מ
+  </text>
+  <text x="300" y="335" font-family="system-ui, sans-serif" font-size="13" font-weight="500" fill="#38BDF8" text-anchor="middle" direction="rtl">
+    הובלה, פריקת מנוף ומלאי זמין בסניפי החרש 4 והתלמיד 1
+  </text>
+</svg>

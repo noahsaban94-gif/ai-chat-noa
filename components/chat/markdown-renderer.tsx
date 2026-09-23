@@ -164,6 +164,26 @@ export function MarkdownRenderer({
           )
         }
 
+        if (domNode.name === "img") {
+          const src = domNode.attribs.src || ""
+          const alt = domNode.attribs.alt || "תמונת מוצר סבן"
+          return (
+            <span className="block my-2.5 max-w-sm rounded-xl overflow-hidden shadow-md border border-slate-200/80 bg-slate-900 group">
+              <img
+                src={src}
+                alt={alt}
+                className="w-full h-auto object-cover max-h-56 transition-transform duration-300 group-hover:scale-105"
+                loading="lazy"
+              />
+              {alt && (
+                <span className="block px-3 py-1.5 text-xs font-bold text-slate-200 bg-slate-950/80 text-center" dir="rtl">
+                  {alt}
+                </span>
+              )}
+            </span>
+          )
+        }
+
         // Ordered List
         if (domNode.name === "ol") {
           return (
@@ -237,6 +257,30 @@ export function MarkdownRenderer({
         continue
       }
 
+      // Check for images: ![alt](url)
+      const imageMatch = remaining.match(/^!\[([^\]]*)\]\(([^)]+)\)/)
+      if (imageMatch) {
+        const altText = imageMatch[1] || "תמונת מוצר סבן"
+        const imgUrl = imageMatch[2]
+        elements.push(
+          <span key={keyIndex++} className="block my-2.5 max-w-sm rounded-xl overflow-hidden shadow-md border border-slate-200/80 bg-slate-900 group">
+            <img
+              src={imgUrl}
+              alt={altText}
+              className="w-full h-auto object-cover max-h-56 transition-transform duration-300 group-hover:scale-105"
+              loading="lazy"
+            />
+            {altText && (
+              <span className="block px-3 py-1.5 text-xs font-bold text-slate-200 bg-slate-950/80 text-center" dir="rtl">
+                {altText}
+              </span>
+            )}
+          </span>,
+        )
+        remaining = remaining.slice(imageMatch[0].length)
+        continue
+      }
+
       // Check for links
       const linkMatch = remaining.match(/^\[([^\]]+)\]\(([^)]+)\)/)
       if (linkMatch) {
@@ -256,7 +300,7 @@ export function MarkdownRenderer({
       }
 
       // Find next special character or add remaining text
-      const nextSpecial = remaining.search(/[`*[\]()]/)
+      const nextSpecial = remaining.search(/[`*[\]()!]/)
       if (nextSpecial === -1) {
         elements.push(remaining)
         break
@@ -324,6 +368,30 @@ export function MarkdownRenderer({
         continue
       }
 
+      // Check for images: ![alt](url)
+      const animatedImageMatch = remaining.match(/^!\[([^\]]*)\]\(([^)]+)\)/)
+      if (animatedImageMatch) {
+        const altText = animatedImageMatch[1] || "תמונת מוצר סבן"
+        const imgUrl = animatedImageMatch[2]
+        elements.push(
+          <span key={keyIndex++} className="block my-2.5 max-w-sm rounded-xl overflow-hidden shadow-md border border-slate-200/80 bg-slate-900 group">
+            <img
+              src={imgUrl}
+              alt={altText}
+              className="w-full h-auto object-cover max-h-56 transition-transform duration-300 group-hover:scale-105"
+              loading="lazy"
+            />
+            {altText && (
+              <span className="block px-3 py-1.5 text-xs font-bold text-slate-200 bg-slate-950/80 text-center" dir="rtl">
+                {altText}
+              </span>
+            )}
+          </span>,
+        )
+        remaining = remaining.slice(animatedImageMatch[0].length)
+        continue
+      }
+
       // Check for links
       const linkMatch = remaining.match(/^\[([^\]]+)\]\(([^)]+)\)/)
       if (linkMatch) {
@@ -343,7 +411,7 @@ export function MarkdownRenderer({
       }
 
       // Find next special character or add remaining text
-      const nextSpecial = remaining.search(/[`*[\]()]/)
+      const nextSpecial = remaining.search(/[`*[\]()!]/)
       if (nextSpecial === -1) {
         const words = remaining.split(/(\s+)/)
         elements.push(
