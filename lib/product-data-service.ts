@@ -42,6 +42,50 @@ export interface ProductLookupResult {
   sku: string
   product?: ProductRecord
   imageUrl?: string
+  localImageUrl?: string | null
+  sheetImageUrl?: string | null
+  source?: "local_upload" | "sheet_column_k" | "catalog_default" | "none"
+  hasLocalFile?: boolean
+  hasSheetUrl?: boolean
+}
+
+/**
+ * Safely inspects local disk on server side for product image existence without breaking client bundling
+ */
+function checkLocalProductImage(cleanSku: string): { localUrl: string | null; isReal: boolean } {
+  if (typeof window !== "undefined") {
+    return { localUrl: `/products/${cleanSku}.jpg`, isReal: false }
+  }
+  try {
+    // Dynamic require so Next.js client bundler does not error
+    const fs = (eval("require"))("fs")
+    const path = (eval("require"))("path")
+    const productsDir = path.join(process.cwd(), "public/products")
+    
+    // Also check root if file was uploaded to root
+    const rootDir = process.cwd()
+    const exts = ["jpg", "png", "jpeg", "webp", "svg"]
+    for (const ext of exts) {
+      const rootCandidate = path.join(rootDir, `${cleanSku}.${ext}`)
+      const targetCandidate = path.join(productsDir, `${cleanSku}.${ext}`)
+      if (fs.existsSync(rootCandidate) && !fs.existsSync(targetCandidate)) {
+        try {
+          fs.copyFileSync(rootCandidate, targetCandidate)
+        } catch {}
+      }
+
+      if (fs.existsSync(targetCandidate)) {
+        const stats = fs.statSync(targetCandidate)
+        return {
+          localUrl: `/products/${cleanSku}.${ext}`,
+          isReal: ext !== "svg" && stats.size > 100,
+        }
+      }
+    }
+  } catch {
+    // non-node environment
+  }
+  return { localUrl: null, isReal: false }
 }
 
 export interface ProductServiceConfig {
@@ -353,28 +397,69 @@ export async function lookupProductBySku(
     return { found: false, sku: "" }
   }
 
-  // Ensure products are loaded
+  // 1. בדיקת קיום קובץ מקומי במערכת (public/products)
+  const localCheck = checkLocalProductImage(cleanSku)
+
+  // 2. ודא טעינת נתונים מגיליון / Apps Script
   await fetchProductDataFromScript(config)
 
-  const product = cachedProducts.get(cleanSku)
-  if (product) {
-    return {
-      found: true,
-      sku: product.sku,
-      product,
-      imageUrl: product.imageUrl,
+  let product = cachedProducts.get(cleanSku)
+  if (!product) {
+    // Fuzzy lookup if exact match not found
+    for (const [key, item] of cachedProducts.entries()) {
+      if (key.includes(cleanSku) || cleanSku.includes(key)) {
+        product = item
+        break
+      }
     }
   }
 
-  // Fuzzy lookup if exact match not found (e.g. SKU enclosed in text)
-  for (const [key, item] of cachedProducts.entries()) {
-    if (key.includes(cleanSku) || cleanSku.includes(key)) {
-      return {
-        found: true,
-        sku: item.sku,
-        product: item,
-        imageUrl: item.imageUrl,
-      }
+  const sheetImageUrl = product?.imageUrl || null
+  const localImageUrl = localCheck.localUrl
+  const hasLocalFile = Boolean(localImageUrl)
+  const hasSheetUrl = Boolean(sheetImageUrl)
+
+  // קדימות:
+  // אם הועלה קובץ מקומי אמיתי (כגון 10002.jpg או 11501.jpg), השתמש בו
+  // אחרת אם יש לינק בעמודה K בגיליון, השתמש בו
+  // אחרת קובץ מקומי / ברירת מחדל
+  let chosenImageUrl: string | undefined = undefined
+  let source: ProductLookupResult["source"] = "none"
+
+  if (localCheck.isReal && localImageUrl) {
+    chosenImageUrl = localImageUrl
+    source = "local_upload"
+  } else if (sheetImageUrl) {
+    chosenImageUrl = sheetImageUrl
+    source = "sheet_column_k"
+  } else if (localImageUrl) {
+    chosenImageUrl = localImageUrl
+    source = "catalog_default"
+  }
+
+  if (product || hasLocalFile) {
+    const finalProduct: ProductRecord = product || {
+      sku: cleanSku,
+      name: `מוצר מק"ט ${cleanSku}`,
+      category: "חומרי בניין",
+      unit: "יח'",
+      source: "cache",
+      imageUrl: chosenImageUrl,
+    }
+
+    return {
+      found: true,
+      sku: finalProduct.sku,
+      product: {
+        ...finalProduct,
+        imageUrl: chosenImageUrl,
+      },
+      imageUrl: chosenImageUrl,
+      localImageUrl,
+      sheetImageUrl,
+      source,
+      hasLocalFile,
+      hasSheetUrl,
     }
   }
 

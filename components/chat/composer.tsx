@@ -461,13 +461,13 @@ export function Composer({
                 </span>
                 <span className="font-semibold text-amber-950">
                   {activeSku
-                    ? `מאתרת נתונים ותמונה עבור מק"ט ${activeSku} במקור הנתונים...`
-                    : "מבצעת שאילתת מק\"ט במקור הנתונים (מילון לוגיסטי)..."}
+                    ? `שולפת נתוני מק"ט ${activeSku} ותמונת מוצר (מאגר מקומי + גיליון מילון_לוגיסטי)...`
+                    : "מבצעת שאילתת מק\"ט במאגר המקומי ובגיליון מילון_לוגיסטי..."}
                 </span>
               </div>
               <div className="flex items-center gap-1.5 text-[11px] font-medium text-amber-800">
                 <Loader2 className="w-3 h-3 animate-spin text-amber-600" />
-                <span className="hidden sm:inline">גיליון מילון_לוגיסטי</span>
+                <span className="hidden sm:inline">מאגר מקומי + גיליון</span>
               </div>
             </div>
           )}

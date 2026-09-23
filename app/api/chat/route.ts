@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai"
 import { HISTORICAL_63_CLIENTS, findBestClientMatch, searchClients } from "@/lib/historical-clients"
 import { TRAINING_PRODUCTS, findTrainingVideos } from "@/lib/training-videos"
 import { PRODUCT_MEDIA_CATALOG } from "@/lib/product-media"
-import { buildProductMediaPrompt } from "@/lib/product-media-server"
+import { buildProductMediaPrompt, buildTargetedProductMediaSnippet } from "@/lib/product-media-server"
 import { sendOneSignalPush } from "@/lib/onesignal"
 import { db } from "@/lib/firebase-auth"
 import {
@@ -664,6 +664,7 @@ ${matchedTrainingVideos.slice(0, 2).map((v) => `* **${v.name}**
 `
 
     const productMediaPrompt = await buildProductMediaPrompt()
+    const targetedProductSnippet = await buildTargetedProductMediaSnippet(latestUserMessage)
 
     const verifiedIdentityBanner = verifiedUser
       ? `
@@ -694,6 +695,7 @@ ${matchedTrainingVideos.slice(0, 2).map((v) => `* **${v.name}**
 ${verifiedIdentityBanner}
 ${oneSignalStatusNote}
 ${trainingVideosPrompt}
+${targetedProductSnippet}
 ${productMediaPrompt}
 ${firestoreContextPrompt}
 
@@ -874,7 +876,7 @@ ${matchedClientPrompt}
 
     const ai = getGenAI()
 
-    const modelsToTry = ["gemini-3.8-flash", "gemini-3.6-flash"]
+    const modelsToTry = ["gemini-3.6-flash", "gemini-2.5-flash"]
     let responseStream = null
     let lastStreamError: unknown = null
 

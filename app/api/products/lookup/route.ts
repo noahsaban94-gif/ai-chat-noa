@@ -32,6 +32,11 @@ export async function GET(req: NextRequest) {
       found: result.found,
       sku: result.sku,
       imageUrl: result.imageUrl || null,
+      localImageUrl: result.localImageUrl || null,
+      sheetImageUrl: result.sheetImageUrl || null,
+      source: result.source || "none",
+      hasLocalFile: result.hasLocalFile || false,
+      hasSheetUrl: result.hasSheetUrl || false,
       product: result.product || null,
     })
   } catch (error) {

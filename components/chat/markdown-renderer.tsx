@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils"
 import type React from "react"
 import { useState, useEffect } from "react"
 import { AnalysisWordSpan } from "./analysis-word-span"
-import { Sparkles } from "lucide-react"
+import { Sparkles, Database, FolderCheck, PackageCheck } from "lucide-react"
 import parse, { HTMLReactParserOptions, Element, DOMNode, domToReact } from "html-react-parser"
 import { YouTubeEmbed } from "./youtube-embed"
 import { extractYouTubeVideoId, TRAINING_PRODUCTS } from "@/lib/training-videos"
@@ -20,13 +20,22 @@ interface MarkdownRendererProps {
 function ProductChatImage({ src, alt }: { src: string; alt?: string }) {
   const [currentSrc, setCurrentSrc] = useState(src)
   const [triedExts, setTriedExts] = useState<string[]>([])
+  const [triedApiFallback, setTriedApiFallback] = useState(false)
 
   useEffect(() => {
     setCurrentSrc(src)
     setTriedExts([])
+    setTriedApiFallback(false)
   }, [src])
 
-  const handleError = () => {
+  // Extract possible SKU from src or alt
+  const detectedSku =
+    currentSrc.match(/(?:products\/|^|id=)(\d{4,6})/i)?.[1] ||
+    alt?.match(/(\d{4,6})/)?.[1] ||
+    null
+
+  const handleError = async () => {
+    // 1. If it was a local /products/ file, try alternate extensions
     const match = currentSrc.match(/^(.*\/products\/[^.]+)\.([a-zA-Z0-9]+)$/)
     if (match) {
       const basePath = match[1]
@@ -39,26 +48,79 @@ function ProductChatImage({ src, alt }: { src: string; alt?: string }) {
         return
       }
     }
+
+    // 2. If alternate extensions failed or it was external, try API lookup for the SKU to get the opposite source
+    if (detectedSku && !triedApiFallback) {
+      setTriedApiFallback(true)
+      try {
+        const res = await fetch(`/api/products/lookup?sku=${detectedSku}`)
+        if (res.ok) {
+          const data = await res.json()
+          // If current was external and failed, try localImageUrl
+          if (currentSrc.startsWith("http") && data.localImageUrl && data.localImageUrl !== currentSrc) {
+            setCurrentSrc(data.localImageUrl)
+            return
+          }
+          // If current was local and failed, try sheetImageUrl
+          if (data.sheetImageUrl && data.sheetImageUrl !== currentSrc) {
+            setCurrentSrc(data.sheetImageUrl)
+            return
+          }
+        }
+      } catch (e) {
+        console.warn("Product image fallback lookup failed:", e)
+      }
+    }
+
+    // 3. Fallback to default building material svg
     if (currentSrc !== "/products/default-building-material.svg") {
       setCurrentSrc("/products/default-building-material.svg")
     }
   }
 
   const altTitle = alt && alt !== "null" && alt !== "undefined" ? alt : "תמונת מוצר סבן"
+  const isLocalStorage = currentSrc.startsWith("/products/") && !currentSrc.includes("default-building-material")
+  const isSheetStorage = currentSrc.startsWith("http")
 
   return (
-    <span className="block my-3 max-w-sm rounded-2xl overflow-hidden shadow-lg border border-slate-700/60 bg-slate-900 group">
-      <img
-        src={currentSrc}
-        alt={altTitle}
-        className="w-full h-auto object-cover max-h-64 transition-transform duration-300 group-hover:scale-105"
-        loading="lazy"
-        referrerPolicy="no-referrer"
-        onError={handleError}
-      />
+    <span className="block my-3 max-w-sm rounded-2xl overflow-hidden shadow-lg border border-slate-700/60 bg-slate-900 group relative">
+      <div className="relative overflow-hidden bg-slate-950/60 min-h-[160px] flex items-center justify-center">
+        <img
+          src={currentSrc}
+          alt={altTitle}
+          className="w-full h-auto object-cover max-h-72 transition-transform duration-300 group-hover:scale-105"
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={handleError}
+        />
+        {/* Source badge */}
+        <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-10" dir="rtl">
+          {isLocalStorage ? (
+            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold backdrop-blur-md border shadow-xs text-emerald-300 bg-emerald-950/85 border-emerald-500/40">
+              <FolderCheck className="w-3 h-3 text-emerald-400" />
+              <span>מאגר מקומי</span>
+            </span>
+          ) : isSheetStorage ? (
+            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold backdrop-blur-md border shadow-xs text-sky-300 bg-sky-950/85 border-sky-500/40">
+              <Database className="w-3 h-3 text-sky-400" />
+              <span>גיליון מילון_לוגיסטי</span>
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold backdrop-blur-md border shadow-xs text-slate-300 bg-slate-900/85 border-slate-600/40">
+              <PackageCheck className="w-3 h-3 text-amber-400" />
+              <span>סבן חומרי בניין</span>
+            </span>
+          )}
+        </div>
+      </div>
       {altTitle && (
-        <span className="block px-3 py-1.5 text-xs font-bold text-slate-200 bg-slate-950/90 text-center border-t border-slate-800" dir="rtl">
-          {altTitle}
+        <span className="block px-3 py-2 text-xs font-bold text-slate-200 bg-slate-950/95 text-center border-t border-slate-800 flex items-center justify-between" dir="rtl">
+          <span className="truncate">{altTitle}</span>
+          {detectedSku && (
+            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/60 shrink-0">
+              מק״ט {detectedSku}
+            </span>
+          )}
         </span>
       )}
     </span>
@@ -618,8 +680,9 @@ export function MarkdownRenderer({
       // Check for HTML content
       if (hasHtml(part)) {
         try {
-          // Pre-convert simple inline markdown bold/italic if mixed inside HTML
+          // Pre-convert simple inline markdown bold/italic and markdown images if mixed inside HTML
           const processedHtml = part
+            .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" />')
             .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
             .replace(/(^|[^*])\*([^*]+)\*([^*]|$)/g, "$1<em>$2</em>$3")
 
