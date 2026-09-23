@@ -17,6 +17,53 @@ interface MarkdownRendererProps {
   style?: React.CSSProperties
 }
 
+function ProductChatImage({ src, alt }: { src: string; alt?: string }) {
+  const [currentSrc, setCurrentSrc] = useState(src)
+  const [triedExts, setTriedExts] = useState<string[]>([])
+
+  useEffect(() => {
+    setCurrentSrc(src)
+    setTriedExts([])
+  }, [src])
+
+  const handleError = () => {
+    const match = currentSrc.match(/^(.*\/products\/[^.]+)\.([a-zA-Z0-9]+)$/)
+    if (match) {
+      const basePath = match[1]
+      const currentExt = match[2].toLowerCase()
+      const candidateExts = ["png", "jpg", "jpeg", "webp", "svg"]
+      const nextExt = candidateExts.find((ext) => ext !== currentExt && !triedExts.includes(ext))
+      if (nextExt) {
+        setTriedExts((prev) => [...prev, currentExt])
+        setCurrentSrc(`${basePath}.${nextExt}`)
+        return
+      }
+    }
+    if (currentSrc !== "/products/default-building-material.svg") {
+      setCurrentSrc("/products/default-building-material.svg")
+    }
+  }
+
+  const altTitle = alt && alt !== "null" && alt !== "undefined" ? alt : "תמונת מוצר סבן"
+
+  return (
+    <span className="block my-3 max-w-sm rounded-2xl overflow-hidden shadow-lg border border-slate-700/60 bg-slate-900 group">
+      <img
+        src={currentSrc}
+        alt={altTitle}
+        className="w-full h-auto object-cover max-h-64 transition-transform duration-300 group-hover:scale-105"
+        loading="lazy"
+        onError={handleError}
+      />
+      {altTitle && (
+        <span className="block px-3 py-1.5 text-xs font-bold text-slate-200 bg-slate-950/90 text-center border-t border-slate-800" dir="rtl">
+          {altTitle}
+        </span>
+      )}
+    </span>
+  )
+}
+
 export function MarkdownRenderer({
   content,
   className,
@@ -167,21 +214,7 @@ export function MarkdownRenderer({
         if (domNode.name === "img") {
           const src = domNode.attribs.src || ""
           const alt = domNode.attribs.alt || "תמונת מוצר סבן"
-          return (
-            <span className="block my-2.5 max-w-sm rounded-xl overflow-hidden shadow-md border border-slate-200/80 bg-slate-900 group">
-              <img
-                src={src}
-                alt={alt}
-                className="w-full h-auto object-cover max-h-56 transition-transform duration-300 group-hover:scale-105"
-                loading="lazy"
-              />
-              {alt && (
-                <span className="block px-3 py-1.5 text-xs font-bold text-slate-200 bg-slate-950/80 text-center" dir="rtl">
-                  {alt}
-                </span>
-              )}
-            </span>
-          )
+          return <ProductChatImage key={domNode.attribs.key || src} src={src} alt={alt} />
         }
 
         // Ordered List
@@ -263,19 +296,7 @@ export function MarkdownRenderer({
         const altText = imageMatch[1] || "תמונת מוצר סבן"
         const imgUrl = imageMatch[2]
         elements.push(
-          <span key={keyIndex++} className="block my-2.5 max-w-sm rounded-xl overflow-hidden shadow-md border border-slate-200/80 bg-slate-900 group">
-            <img
-              src={imgUrl}
-              alt={altText}
-              className="w-full h-auto object-cover max-h-56 transition-transform duration-300 group-hover:scale-105"
-              loading="lazy"
-            />
-            {altText && (
-              <span className="block px-3 py-1.5 text-xs font-bold text-slate-200 bg-slate-950/80 text-center" dir="rtl">
-                {altText}
-              </span>
-            )}
-          </span>,
+          <ProductChatImage key={`img-${keyIndex++}`} src={imgUrl} alt={altText} />
         )
         remaining = remaining.slice(imageMatch[0].length)
         continue
@@ -374,19 +395,7 @@ export function MarkdownRenderer({
         const altText = animatedImageMatch[1] || "תמונת מוצר סבן"
         const imgUrl = animatedImageMatch[2]
         elements.push(
-          <span key={keyIndex++} className="block my-2.5 max-w-sm rounded-xl overflow-hidden shadow-md border border-slate-200/80 bg-slate-900 group">
-            <img
-              src={imgUrl}
-              alt={altText}
-              className="w-full h-auto object-cover max-h-56 transition-transform duration-300 group-hover:scale-105"
-              loading="lazy"
-            />
-            {altText && (
-              <span className="block px-3 py-1.5 text-xs font-bold text-slate-200 bg-slate-950/80 text-center" dir="rtl">
-                {altText}
-              </span>
-            )}
-          </span>,
+          <ProductChatImage key={`anim-img-${keyIndex++}`} src={imgUrl} alt={altText} />
         )
         remaining = remaining.slice(animatedImageMatch[0].length)
         continue
