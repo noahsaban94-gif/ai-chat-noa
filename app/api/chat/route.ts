@@ -120,7 +120,7 @@ interface ChatMessage {
 /**
  * מנתב מודלים חכם: Gemini ⬅️ OpenAI ⬅️ Claude
  */
-export async function generateWithProviderFallback(
+async function generateWithProviderFallback(
   systemInstruction: string,
   messages: ChatMessage[]
 ): Promise<string> {
