@@ -143,26 +143,33 @@ export function ChatShell() {
   useEffect(() => {
     let unsubscribe: (() => void) | undefined
     try {
-      unsubscribe = listenToConversation(ACTIVE_SESSION_ID, (firestoreDocs) => {
-        if (firestoreDocs && firestoreDocs.length > 0) {
-          setIsFirestoreConnected(true)
-          if (!isStreamingRef.current) {
-            const uiMsgs: Message[] = firestoreDocs.map((doc) => messageDocumentToUIMessage(doc))
-            setMessages(uiMsgs)
+      unsubscribe = listenToConversation(
+        ACTIVE_SESSION_ID,
+        (firestoreDocs) => {
+          if (firestoreDocs && firestoreDocs.length > 0) {
+            setIsFirestoreConnected(true)
+            if (!isStreamingRef.current) {
+              const uiMsgs: Message[] = firestoreDocs.map((doc) => messageDocumentToUIMessage(doc))
+              setMessages(uiMsgs)
+            }
+          } else {
+            // If Firestore is empty, auto-inject the initial conversation context
+            seedFirestoreConversations(false)
+              .then((res) => {
+                if (res.success) {
+                  setIsFirestoreConnected(true)
+                }
+              })
+              .catch(() => {})
           }
-        } else {
-          // If Firestore is empty, auto-inject the initial conversation context
-          seedFirestoreConversations(false)
-            .then((res) => {
-              if (res.success) {
-                setIsFirestoreConnected(true)
-              }
-            })
-            .catch((err) => console.warn("Auto-seed error:", err))
+        },
+        50,
+        () => {
+          setIsFirestoreConnected(false)
         }
-      })
-    } catch (e) {
-      console.warn("Firestore listener not connected, falling back to local storage:", e)
+      )
+    } catch {
+      setIsFirestoreConnected(false)
     }
 
     return () => {

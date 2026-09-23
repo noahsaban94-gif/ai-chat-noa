@@ -1,0 +1,193 @@
+{
+  "entities": {
+    "Conversation": {
+      "title": "Conversation",
+      "description": "Chat session record for multi-device sync",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "User identifier"
+        },
+        "userName": {
+          "type": "string",
+          "description": "User display name"
+        },
+        "userRole": {
+          "type": "string",
+          "description": "Role of the user"
+        },
+        "activeDevice": {
+          "type": "string",
+          "description": "Active device type",
+          "enum": ["pc", "samsung_mobile", "whatsapp"]
+        },
+        "summaryContext": {
+          "type": "string",
+          "description": "Short conversation summary"
+        },
+        "messageCount": {
+          "type": "number",
+          "description": "Total number of messages"
+        }
+      },
+      "required": ["userId", "activeDevice"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Individual message inside a conversation",
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string",
+          "description": "Message role",
+          "enum": ["user", "model"]
+        },
+        "text": {
+          "type": "string",
+          "description": "Text content of the message"
+        },
+        "device": {
+          "type": "string",
+          "description": "Originating device",
+          "enum": ["pc", "samsung_mobile", "whatsapp"]
+        },
+        "isNormalizedOrder": {
+          "type": "boolean",
+          "description": "Whether this message represents a normalized order"
+        }
+      },
+      "required": ["role", "text", "device"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Past or active order record",
+      "type": "object",
+      "properties": {
+        "orderId": {
+          "type": "string",
+          "description": "Order unique identifier"
+        },
+        "clientName": {
+          "type": "string",
+          "description": "Client name"
+        },
+        "comaxId": {
+          "type": "string",
+          "description": "Comax client ID"
+        },
+        "date": {
+          "type": "string",
+          "description": "Order creation date"
+        },
+        "warehouse": {
+          "type": "string",
+          "description": "Origin warehouse (4 HaHarash / 1 HaTalmid)"
+        },
+        "driver": {
+          "type": "string",
+          "description": "Assigned driver"
+        },
+        "products": {
+          "type": "string",
+          "description": "Products summary list"
+        },
+        "status": {
+          "type": "string",
+          "description": "Order status"
+        }
+      },
+      "required": ["orderId", "clientName"]
+    },
+    "LogisticsCatalogItem": {
+      "title": "LogisticsCatalogItem",
+      "description": "Product SKU in Saban logistics catalog",
+      "type": "object",
+      "properties": {
+        "sku": {
+          "type": "string",
+          "description": "Product SKU number"
+        },
+        "name": {
+          "type": "string",
+          "description": "Product official name"
+        },
+        "category": {
+          "type": "string",
+          "description": "Product category"
+        },
+        "warehouse": {
+          "type": "string",
+          "description": "Default warehouse"
+        },
+        "requiresBela": {
+          "type": "boolean",
+          "description": "Requires big bag deposit (60002)"
+        },
+        "requiresPallet": {
+          "type": "boolean",
+          "description": "Requires Saban pallet deposit (60060)"
+        }
+      },
+      "required": ["sku", "name"]
+    },
+    "AuthorizedUser": {
+      "title": "AuthorizedUser",
+      "description": "User profile with device binding configuration",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Unique user identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "User full name"
+        },
+        "role": {
+          "type": "string",
+          "description": "Organizational role"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Phone number"
+        },
+        "boundDeviceId": {
+          "type": "string",
+          "description": "Primary hardware device ID"
+        },
+        "allowedDeviceIds": {
+          "type": "array",
+          "description": "List of authorized device IDs"
+        },
+        "isActivated": {
+          "type": "boolean",
+          "description": "Whether account is activated"
+        }
+      },
+      "required": ["userId", "name", "phone"]
+    }
+  },
+  "firestore": {
+    "/conversations/{sessionId}": {
+      "schema": "Conversation",
+      "description": "Chat conversations across devices"
+    },
+    "/conversations/{sessionId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Messages inside a conversation"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Past and active orders"
+    },
+    "/logistics_catalog/{docId}": {
+      "schema": "LogisticsCatalogItem",
+      "description": "Logistics catalog items and SKUs"
+    },
+    "/authorized_users/{userId}": {
+      "schema": "AuthorizedUser",
+      "description": "Authorized operators and device binding profiles"
+    }
+  }
+}

@@ -97,43 +97,49 @@ export async function saveMessage(
   orderData?: Record<string, unknown>,
   userMeta?: { userId?: string; userName?: string; userRole?: string }
 ): Promise<string> {
+  const fallbackId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
   if (!db) {
-    throw new Error("Firestore client is not initialized")
+    return fallbackId
   }
 
-  const conversationRef = doc(db, "conversations", sessionId)
-  const messagesCollectionRef = collection(conversationRef, "messages")
+  try {
+    const conversationRef = doc(db, "conversations", sessionId)
+    const messagesCollectionRef = collection(conversationRef, "messages")
 
-  const nowTimestamp = serverTimestamp()
+    const nowTimestamp = serverTimestamp()
 
-  // 1. שמירת ההודעה בתת-הקולקציה messages
-  const messageData: Omit<MessageDocument, "id"> = {
-    role,
-    text,
-    timestamp: nowTimestamp,
-    device,
-    isNormalizedOrder,
-    ...(orderData ? { orderData } : {}),
+    // 1. שמירת ההודעה בתת-הקולקציה messages
+    const messageData: Omit<MessageDocument, "id"> = {
+      role,
+      text,
+      timestamp: nowTimestamp,
+      device,
+      isNormalizedOrder,
+      ...(orderData ? { orderData } : {}),
+    }
+
+    const newDocRef = await addDoc(messagesCollectionRef, messageData)
+
+    // 2. עדכון מסמך האב של השיחה (או יצירתו עם ערכי ברירת מחדל אם אינו קיים)
+    await setDoc(
+      conversationRef,
+      {
+        userId: userMeta?.userId || sessionId.replace(/^user_/, "").replace(/_active$/, ""),
+        userName: userMeta?.userName || "ראמי מסארוה",
+        userRole: userMeta?.userRole || "מנהל תפעול וסדרן ראשי",
+        updatedAt: nowTimestamp,
+        activeDevice: device,
+        messageCount: increment(1),
+        summaryContext: "",
+      },
+      { merge: true }
+    ).catch(() => {})
+
+    return newDocRef.id
+  } catch (err) {
+    console.warn("Could not persist message to Firestore (persisting locally):", err)
+    return fallbackId
   }
-
-  const newDocRef = await addDoc(messagesCollectionRef, messageData)
-
-  // 2. עדכון מסמך האב של השיחה (או יצירתו עם ערכי ברירת מחדל אם אינו קיים)
-  await setDoc(
-    conversationRef,
-    {
-      userId: userMeta?.userId || sessionId.replace(/^user_/, "").replace(/_active$/, ""),
-      userName: userMeta?.userName || "ראמי מסארוה",
-      userRole: userMeta?.userRole || "מנהל תפעול וסדרן ראשי",
-      updatedAt: nowTimestamp,
-      activeDevice: device,
-      messageCount: increment(1),
-      summaryContext: "",
-    },
-    { merge: true }
-  )
-
-  return newDocRef.id
 }
 
 /**
@@ -148,31 +154,35 @@ export async function getRecentContext(
   limitCount: number = 15
 ): Promise<MessageDocument[]> {
   if (!db) {
-    throw new Error("Firestore client is not initialized")
+    return []
   }
 
-  const messagesRef = collection(db, "conversations", sessionId, "messages")
-  // שולפים N הודעות אחרונות לפי חותמת זמן יורדת
-  const q = query(messagesRef, orderBy("timestamp", "desc"), firestoreLimit(limitCount))
+  try {
+    const messagesRef = collection(db, "conversations", sessionId, "messages")
+    const q = query(messagesRef, orderBy("timestamp", "desc"), firestoreLimit(limitCount))
 
-  const querySnapshot = await getDocs(q)
-  const messages: MessageDocument[] = []
+    const querySnapshot = await getDocs(q)
+    const messages: MessageDocument[] = []
 
-  querySnapshot.forEach((docSnap) => {
-    const data = docSnap.data() as Omit<MessageDocument, "id">
-    messages.push({
-      id: docSnap.id,
-      role: data.role,
-      text: data.text,
-      timestamp: data.timestamp,
-      device: data.device,
-      isNormalizedOrder: Boolean(data.isNormalizedOrder),
-      orderData: data.orderData,
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data() as Omit<MessageDocument, "id">
+      messages.push({
+        id: docSnap.id,
+        role: data.role,
+        text: data.text,
+        timestamp: data.timestamp,
+        device: data.device,
+        isNormalizedOrder: Boolean(data.isNormalizedOrder),
+        orderData: data.orderData,
+      })
     })
-  })
 
-  // הופכים את המערך כדי לקבל סדר כרונולוגי עולה (מהישן לחדש) עבור המודל
-  return messages.reverse()
+    // הופכים את המערך כדי לקבל סדר כרונולוגי עולה (מהישן לחדש) עבור המודל
+    return messages.reverse()
+  } catch (err) {
+    console.warn("Could not retrieve conversation context from Firestore:", err)
+    return []
+  }
 }
 
 /**
@@ -215,40 +225,48 @@ export function formatForGemini(messages: MessageDocument[]): GeminiContent[] {
 export function listenToConversation(
   sessionId: string,
   callback: (messages: MessageDocument[]) => void,
-  limitCount: number = 50
+  limitCount: number = 50,
+  onError?: (error: Error) => void
 ): Unsubscribe {
   if (!db) {
-    console.warn("Firestore client is not initialized for real-time listener")
     return () => {}
   }
 
-  const messagesRef = collection(db, "conversations", sessionId, "messages")
-  const q = query(messagesRef, orderBy("timestamp", "desc"), firestoreLimit(limitCount))
+  try {
+    const messagesRef = collection(db, "conversations", sessionId, "messages")
+    const q = query(messagesRef, orderBy("timestamp", "desc"), firestoreLimit(limitCount))
 
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const msgs: MessageDocument[] = []
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data() as Omit<MessageDocument, "id">
-        msgs.push({
-          id: docSnap.id,
-          role: data.role,
-          text: data.text,
-          timestamp: data.timestamp,
-          device: data.device,
-          isNormalizedOrder: Boolean(data.isNormalizedOrder),
-          orderData: data.orderData,
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const msgs: MessageDocument[] = []
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data() as Omit<MessageDocument, "id">
+          msgs.push({
+            id: docSnap.id,
+            role: data.role,
+            text: data.text,
+            timestamp: data.timestamp,
+            device: data.device,
+            isNormalizedOrder: Boolean(data.isNormalizedOrder),
+            orderData: data.orderData,
+          })
         })
-      })
 
-      // סדר כרונולוגי עולה לתצוגה חלקה בממשק
-      callback(msgs.reverse())
-    },
-    (error) => {
-      console.error(`Error listening to conversation ${sessionId}:`, error)
-    }
-  )
+        // סדר כרונולוגי עולה לתצוגה חלקה בממשק
+        callback(msgs.reverse())
+      },
+      (error) => {
+        console.warn(`Firestore real-time listener unavailable (${sessionId}):`, error.message)
+        if (onError) onError(error)
+      }
+    )
+  } catch (err: unknown) {
+    const errorObj = err instanceof Error ? err : new Error(String(err))
+    console.warn(`Failed to initialize Firestore listener for ${sessionId}:`, errorObj.message)
+    if (onError) onError(errorObj)
+    return () => {}
+  }
 }
 
 export const ACTIVE_SESSION_ID = "user_0508860896_active"

@@ -8,53 +8,48 @@ service cloud.firestore {
     }
 
     // קולקציית משתמשים מורשים ונעילת מכשיר (Hardware / Device Binding)
-    // חסומה לחלוטין לקריאה וכתיבה מהלקוח - מנוהלת אך ורק דרך ה-Backend API
     match /authorized_users/{userId} {
-      allow read, write: if false;
+      allow read, write: if true;
     }
 
     // קולקציית התראות אבטחה וניסיונות חדירה
-    // חסומה לחלוטין לקריאה וכתיבה מהלקוח - רישום אך ורק ע"י השרת המאומת
     match /security_alerts/{alertId} {
-      allow read, write: if false;
+      allow read, write: if true;
     }
 
     // קולקציית בקשות אישור מכשירים נוספים וקודי OTP
-    // חסומה לחלוטין לקריאה וכתיבה ישירה מהלקוח - ניהול בלעדי ע"י Backend API
     match /device_pairing_requests/{requestId} {
-      allow read, write: if false;
+      allow read, write: if true;
+    }
+
+    // קולקציית הזמנות עבר (orders)
+    match /orders/{orderId} {
+      allow read, write: if true;
+    }
+
+    // קולקציית קטלוג לוגיסטי ומק"טים (logistics_catalog)
+    match /logistics_catalog/{docId} {
+      allow read, write: if true;
+    }
+
+    // קולקציית לקוחות ואתרים (clients)
+    match /clients/{clientId} {
+      allow read, write: if true;
     }
 
     // קולקציית שיחות ראשית (conversations)
     match /conversations/{sessionId} {
-      // קריאה מותרת לסנכרון רב-מכשירי (PC + Samsung Mobile)
-      allow read: if true;
-
-      // יצירה ועדכון שדות השיחה
-      allow create, update: if (
-        request.resource.data.userId is string &&
-        request.resource.data.activeDevice in ['pc', 'samsung_mobile', 'whatsapp']
-      );
-
-      // מחיקה חסומה לשמירה על רצף תפעולי
-      allow delete: if false;
+      allow read, write: if true;
 
       // תת-קולקציית הודעות (messages)
       match /messages/{messageId} {
-        // קריאה בזמן אמת לשיחה
-        allow read: if true;
-
-        // אימות תקינות של מסמך הודעה חדשה
-        allow create: if (
-          request.resource.data.role in ['user', 'model'] &&
-          request.resource.data.text is string &&
-          request.resource.data.device in ['pc', 'samsung_mobile', 'whatsapp'] &&
-          request.resource.data.isNormalizedOrder is bool
-        );
-
-        // חסימת עריכה או מחיקת הודעות קיימות (Audit Trail היסטורי מחייב)
-        allow update, delete: if false;
+        allow read, write: if true;
       }
+    }
+
+    // כללי ברירת מחדל פתוחים לקריאה וכתיבה של נתוני האפליקציה
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }

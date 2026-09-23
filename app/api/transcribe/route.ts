@@ -6,7 +6,14 @@ let aiClient: GoogleGenAI | null = null
 function getGenAI(): GoogleGenAI {
   if (!aiClient) {
     const apiKey = process.env.GEMINI_API_KEY
-    aiClient = new GoogleGenAI({ apiKey })
+    aiClient = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
+      },
+    })
   }
   return aiClient
 }
@@ -41,22 +48,8 @@ export async function POST(req: NextRequest) {
     }
 
     const ai = getGenAI()
-    let response
-    try {
-      response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                inlineData: {
-                  data: base64Data,
-                  mimeType,
-                },
-              },
-              {
-                text: `אתה מנוע תמלול קולי מתקדם (Voice-to-Order) של חברת ח. סבן חומרי בניין (1994) בע״מ, המיועד לפענוח הקלטות קוליות והודעות וואטסאפ מנהגים, קבלנים וסדרני עבודה (ראמי, חכמת, עלי, וקבלנים בשטח).
+
+    const promptText = `אתה מנוע תמלול קולי מתקדם (Voice-to-Order) של חברת ח. סבן חומרי בניין (1994) בע״מ, המיועד לפענוח הקלטות קוליות והודעות וואטסאפ מנהגים, קבלנים וסדרני עבודה (ראמי, חכמת, עלי, וקבלנים בשטח).
 
 הוראות תמלול מחייבות:
 1. תמלל באופן מדויק, נאמן ומלא את הדיבור מהקלטת השמע הזו.
@@ -68,36 +61,55 @@ export async function POST(req: NextRequest) {
    - יישובים: כפר שמריהו, הרצליה פיתוח, הוד השרון, רמת השרון, תל אביב, רעננה, נתניה, פתח תקווה.
 4. אם נאמרות מילים בערבית (כמו: שוואל/שואיל, רמל, סמסם, כמינט, טיין, משרוע, אסמנת, כלאט, ורד, וכו'), תרגם אותן במדויק להקשר העברי של ההזמנה או תמלל את משמעותן הברורה לעברית כדי שנועה תוכל לנרמל מיד לכרטיס סידור.
 5. החזר אך ורק את הטקסט המדויק שנאמר ללא שום הערות מטא, פניות, הקדמות, מרכאות או תוספות.
-6. אם ההקלטה שקטה לחלוטין או שאין בה דיבור, החזר מחרוזת ריקה.`,
+6. אם ההקלטה שקטה לחלוטין או שאין בה דיבור, החזר מחרוזת ריקה.`
+
+    // Robust multi-model fallback chain supporting audio transcription tasks
+    const candidateModels = ["gemini-3.5-transcribe", "gemini-3.8-flash", "gemini-3.6-flash"]
+    let response: { text?: string | null } | null = null
+    let lastError: unknown = null
+
+    for (const model of candidateModels) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          response = await ai.models.generateContent({
+            model,
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    inlineData: {
+                      data: base64Data,
+                      mimeType,
+                    },
+                  },
+                  { text: promptText },
+                ],
               },
             ],
-          },
-        ],
-      })
-    } catch (primaryErr) {
-      console.warn("Primary transcribe model failed, using fallback:", primaryErr)
-      response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                inlineData: {
-                  data: base64Data,
-                  mimeType,
-                },
-              },
-              {
-                text: `תמלל במדויק את הדיבור מהקלטת שמע זו (עברית / ערבית / סלנג בנייה) עבור הזמנת חומרי בניין בסבן. החזר רק את הטקסט המתומלל בלבד ללא שום הערות.`,
-              },
-            ],
-          },
-        ],
-      })
+          })
+          if (response) break
+        } catch (err: unknown) {
+          lastError = err
+          const errString = err instanceof Error ? err.message : String(err)
+          const isHighDemand = errString.includes("503") || errString.includes("UNAVAILABLE")
+          if (isHighDemand && attempt === 0) {
+            // Brief backoff before retry on transient spike
+            await new Promise((resolve) => setTimeout(resolve, 600))
+            continue
+          }
+          console.warn(`Transcribe model ${model} (attempt ${attempt + 1}) encountered:`, errString)
+          break
+        }
+      }
+      if (response) break
     }
 
-    let text = response.text ? response.text.trim() : ""
+    if (!response && lastError) {
+      throw lastError
+    }
+
+    let text = response?.text ? response.text.trim() : ""
     // Filter out generic meta responses if the model tries to explain silence
     if (
       text.includes("לא שומע") ||

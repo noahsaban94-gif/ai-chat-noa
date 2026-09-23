@@ -173,64 +173,78 @@ export async function seedFirestoreConversations(force: boolean = false): Promis
   message: string
 }> {
   if (!db) {
-    throw new Error("Firestore client is not initialized")
-  }
-
-  const conversationRef = doc(db, "conversations", ACTIVE_SESSION_ID)
-  const messagesCollectionRef = collection(conversationRef, "messages")
-
-  // בדיקה אם כבר קיימות הודעות בקולקציה (אלא אם התבקש force=true)
-  if (!force) {
-    const existingSnap = await getDocs(messagesCollectionRef)
-    if (!existingSnap.empty) {
-      return {
-        success: true,
-        count: existingSnap.size,
-        message: `ב-Firestore כבר קיימות ${existingSnap.size} הודעות שמורות. הזיכרון טעון ופעיל.`,
-      }
+    return {
+      success: false,
+      count: 0,
+      message: "לקוח Firestore אינו מאותחל בסביבה זו.",
     }
   }
 
-  const nowMs = Date.now()
-  const batch = writeBatch(db)
+  try {
+    const conversationRef = doc(db, "conversations", ACTIVE_SESSION_ID)
+    const messagesCollectionRef = collection(conversationRef, "messages")
 
-  // 1. עדכון מסמך השיחה הראשי
-  batch.set(
-    conversationRef,
-    {
-      userId: "0508860896",
-      userName: "ראמי מסארוה",
-      userRole: "מנהל תפעול וסדרן ראשי",
-      activeDevice: "samsung_mobile",
-      updatedAt: serverTimestamp(),
-      createdAt: serverTimestamp(),
-      messageCount: INITIAL_CONVERSATION_MESSAGES.length,
-      summaryContext:
-        "שיחת בוקר פעילה עם ראמי מסארוה: חכמת (מרצדס מנוף) מבצע סבבים להוד השרון, הרצליה פיתוח וכפר שמריהו (החורש 21 - עבד). עלי (איסוזו) בקו גבס לתל אביב. הזמנת דיזנגוף 182 נעצרה עקב תנאי תשלום מראש ואתר בעייתי בנת״צ. דגש על סגירת תעודות מול ורד ובקרת משטחי פקדון 60060 אצל אורן בחצר 4.",
-    },
-    { merge: true }
-  )
+    // בדיקה אם כבר קיימות הודעות בקולקציה (אלא אם התבקש force=true)
+    if (!force) {
+      const existingSnap = await getDocs(messagesCollectionRef)
+      if (!existingSnap.empty) {
+        return {
+          success: true,
+          count: existingSnap.size,
+          message: `ב-Firestore כבר קיימות ${existingSnap.size} הודעות שמורות. הזיכרון טעון ופעיל.`,
+        }
+      }
+    }
 
-  // 2. הזרקת ההודעות עם חותמות זמן מדורגות לאחור
-  for (let i = 0; i < INITIAL_CONVERSATION_MESSAGES.length; i++) {
-    const item = INITIAL_CONVERSATION_MESSAGES[i]
-    const msgDocRef = doc(messagesCollectionRef)
-    const msgDate = new Date(nowMs - item.minutesAgo * 60 * 1000)
+    const nowMs = Date.now()
+    const batch = writeBatch(db)
 
-    batch.set(msgDocRef, {
-      role: item.role,
-      text: item.text,
-      timestamp: Timestamp.fromDate(msgDate),
-      device: item.device,
-      isNormalizedOrder: item.isNormalizedOrder,
-    })
-  }
+    // 1. עדכון מסמך השיחה הראשי
+    batch.set(
+      conversationRef,
+      {
+        userId: "0508860896",
+        userName: "ראמי מסארוה",
+        userRole: "מנהל תפעול וסדרן ראשי",
+        activeDevice: "samsung_mobile",
+        updatedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        messageCount: INITIAL_CONVERSATION_MESSAGES.length,
+        summaryContext:
+          "שיחת בוקר פעילה עם ראמי מסארוה: חכמת (מרצדס מנוף) מבצע סבבים להוד השרון, הרצליה פיתוח וכפר שמריהו (החורש 21 - עבד). עלי (איסוזו) בקו גבס לתל אביב. הזמנת דיזנגוף 182 נעצרה עקב תנאי תשלום מראש ואתר בעייתי בנת״צ. דגש על סגירת תעודות מול ורד ובקרת משטחי פקדון 60060 אצל אורן בחצר 4.",
+      },
+      { merge: true }
+    )
 
-  await batch.commit()
+    // 2. הזרקת ההודעות עם חותמות זמן מדורגות לאחור
+    for (let i = 0; i < INITIAL_CONVERSATION_MESSAGES.length; i++) {
+      const item = INITIAL_CONVERSATION_MESSAGES[i]
+      const msgDocRef = doc(messagesCollectionRef)
+      const msgDate = new Date(nowMs - item.minutesAgo * 60 * 1000)
 
-  return {
-    success: true,
-    count: INITIAL_CONVERSATION_MESSAGES.length,
-    message: `הוזרקו בהצלחה ${INITIAL_CONVERSATION_MESSAGES.length} הודעות ל-Cloud Firestore. הזיכרון ההיסטורי של נועה הופעל!`,
+      batch.set(msgDocRef, {
+        role: item.role,
+        text: item.text,
+        timestamp: Timestamp.fromDate(msgDate),
+        device: item.device,
+        isNormalizedOrder: item.isNormalizedOrder,
+      })
+    }
+
+    await batch.commit()
+
+    return {
+      success: true,
+      count: INITIAL_CONVERSATION_MESSAGES.length,
+      message: `הוזרקו בהצלחה ${INITIAL_CONVERSATION_MESSAGES.length} הודעות ל-Cloud Firestore. הזיכרון ההיסטורי של נועה הופעל!`,
+    }
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    console.warn("Seeding Firestore conversation skipped:", errorMsg)
+    return {
+      success: false,
+      count: 0,
+      message: `שמירה בענן אינה זמינה כעת: ${errorMsg}`,
+    }
   }
 }

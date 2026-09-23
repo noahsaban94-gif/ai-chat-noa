@@ -113,14 +113,54 @@ export function MarkdownRenderer({
           )
         }
 
-        // Table container
+        // Table container and elements
         if (domNode.name === "table") {
           return (
-            <div className="overflow-x-auto my-3 rounded-xl border border-slate-200 shadow-xs" dir="rtl">
-              <table className={cn("w-full text-right text-xs", domNode.attribs.class, domNode.attribs.className)}>
+            <div className="overflow-x-auto my-3 rounded-xl border border-slate-200/90 shadow-xs bg-white" dir="rtl">
+              <table className={cn("w-full text-right text-xs divide-y divide-slate-200", domNode.attribs.class, domNode.attribs.className)}>
                 {domToReact(domNode.children as DOMNode[], parseOptions)}
               </table>
             </div>
+          )
+        }
+
+        if (domNode.name === "thead") {
+          return (
+            <thead className={cn("bg-slate-100/90 text-slate-800 font-extrabold border-b border-slate-200", domNode.attribs.class, domNode.attribs.className)}>
+              {domToReact(domNode.children as DOMNode[], parseOptions)}
+            </thead>
+          )
+        }
+
+        if (domNode.name === "tbody") {
+          return (
+            <tbody className={cn("divide-y divide-slate-100 font-medium bg-white", domNode.attribs.class, domNode.attribs.className)}>
+              {domToReact(domNode.children as DOMNode[], parseOptions)}
+            </tbody>
+          )
+        }
+
+        if (domNode.name === "tr") {
+          return (
+            <tr className={cn("hover:bg-sky-50/40 transition-colors", domNode.attribs.class, domNode.attribs.className)}>
+              {domToReact(domNode.children as DOMNode[], parseOptions)}
+            </tr>
+          )
+        }
+
+        if (domNode.name === "th") {
+          return (
+            <th className={cn("p-2.5 whitespace-nowrap font-extrabold text-slate-800 text-right text-xs", domNode.attribs.class, domNode.attribs.className)}>
+              {domToReact(domNode.children as DOMNode[], parseOptions)}
+            </th>
+          )
+        }
+
+        if (domNode.name === "td") {
+          return (
+            <td className={cn("p-2.5 whitespace-nowrap text-slate-700 text-right text-xs", domNode.attribs.class, domNode.attribs.className)}>
+              {domToReact(domNode.children as DOMNode[], parseOptions)}
+            </td>
           )
         }
 
@@ -369,13 +409,13 @@ export function MarkdownRenderer({
     const rowLines = lines.slice(2) // Skip header and separator
 
     return (
-      <div key={key} className="overflow-x-auto my-3 rounded-xl border border-slate-200 shadow-xs" dir="rtl">
-        <table className="w-full text-right text-xs">
-          <thead className="bg-slate-100 text-slate-700 font-extrabold border-b border-slate-200">
+      <div key={key} className="overflow-x-auto my-3 rounded-xl border border-slate-200/90 shadow-xs bg-white" dir="rtl">
+        <table className="w-full text-right text-xs divide-y divide-slate-200">
+          <thead className="bg-slate-100/90 text-slate-800 font-extrabold border-b border-slate-200">
             <tr>
               {headerCols.map((col, idx) => (
-                <th key={idx} className="p-2.5">
-                  {col}
+                <th key={idx} className="p-2.5 whitespace-nowrap text-right font-extrabold text-slate-800">
+                  {renderPlainInlineMarkdown(col)}
                 </th>
               ))}
             </tr>
@@ -386,11 +426,28 @@ export function MarkdownRenderer({
                 .split("|")
                 .map((c) => c.trim())
                 .filter((c, i, a) => i > 0 && i < a.length - 1)
+              const isSummaryRow = cols.some((c) => c.includes("סה״כ") || c.includes('סה"כ') || c.includes("סיכום"))
+
               return (
-                <tr key={rIdx} className="hover:bg-sky-50/50 transition-colors">
+                <tr
+                  key={rIdx}
+                  className={cn(
+                    "transition-colors",
+                    isSummaryRow
+                      ? "bg-slate-100/80 font-bold border-t-2 border-slate-300 text-slate-900"
+                      : "hover:bg-sky-50/50"
+                  )}
+                >
                   {cols.map((col, cIdx) => (
-                    <td key={cIdx} className={`p-2.5 ${cIdx === 0 ? "font-bold text-slate-800" : "text-slate-600"}`}>
-                      {col}
+                    <td
+                      key={cIdx}
+                      className={cn(
+                        "p-2.5 text-right whitespace-nowrap",
+                        cIdx === 0 ? "font-bold text-slate-800" : "text-slate-600",
+                        isSummaryRow && "text-slate-900 font-bold"
+                      )}
+                    >
+                      {renderPlainInlineMarkdown(col)}
                     </td>
                   ))}
                 </tr>

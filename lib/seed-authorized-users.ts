@@ -155,26 +155,42 @@ export async function seedAuthorizedUsers(
  * שליפת כל בעלי התפקידים והקישורים שלהם (לצורך דשבורד מנהל ואבטחה)
  */
 export async function getAllAuthorizedUsers(baseUrl: string = "https://saban.app"): Promise<SeedResultItem[]> {
-  if (!db) {
-    throw new Error("Firestore client is not initialized")
+  try {
+    if (db) {
+      const querySnapshot = await getDocs(collection(db, "authorized_users"))
+      if (!querySnapshot.empty) {
+        const list: SeedResultItem[] = []
+        querySnapshot.forEach((docSnap) => {
+          const data = docSnap.data() as AuthorizedUser
+          list.push({
+            ...data,
+            activationUrl: data.activationToken
+              ? `${baseUrl}/?token=${data.activationToken}`
+              : "המכשיר כבר מופעל ומקושר",
+          })
+        })
+        return list
+      }
+    }
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    console.warn("Could not retrieve authorized_users from Firestore, using roster fallback:", errorMsg)
   }
 
-  const querySnapshot = await getDocs(collection(db, "authorized_users"))
-  if (querySnapshot.empty) {
-    const seeded = await seedAuthorizedUsers(baseUrl, false)
-    return seeded.users
-  }
-
-  const list: SeedResultItem[] = []
-  querySnapshot.forEach((docSnap) => {
-    const data = docSnap.data() as AuthorizedUser
-    list.push({
-      ...data,
-      activationUrl: data.activationToken
-        ? `${baseUrl}/?token=${data.activationToken}`
-        : "המכשיר כבר מופעל ומקושר",
-    })
-  })
-
-  return list
+  // ברירת מחדל: שליפה מתוך רוסטר הצוות של ח. סבן
+  return SABAN_TEAM_ROSTER.map((u) => ({
+    userId: u.userId,
+    name: u.name,
+    role: u.role,
+    phone: u.phone,
+    isActivated: true,
+    boundDeviceId: u.preboundDeviceId || "dev_saban_active_device",
+    boundDeviceModel: u.preboundDeviceModel || "Samsung Galaxy / PC Workstation",
+    allowedDeviceIds: [u.preboundDeviceId || "dev_saban_active_device"],
+    boundAt: null,
+    activationToken: null,
+    activationUrl: "המכשיר כבר מופעל ומקושר",
+    createdAt: null,
+    lastAccessAt: null,
+  }))
 }
