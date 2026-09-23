@@ -9,9 +9,13 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "נועה AI ❤️ | ח. סבן חומרי בניין",
-  description: "העוזרת האישית והמוח הלוגיסטי-תפעולי של ראמי מסארוה בחברת ח. סבן חומרי בניין (1994) בע״מ",
+  description: "העוזרת האישית והמוח הלוגיסטי-תפעולי של חברת ח. סבן חומרי בניין (1994) בע״מ, עם נעילת מכשירים ואימות OTP רב-מכשירי (PC + Samsung)",
   generator: "v0.app",
   applicationName: "נועה AI",
+  openGraph: {
+    title: "נועה AI ❤️ | ח. סבן חומרי בניין",
+    description: "העוזרת האישית והמוח הלוגיסטי-תפעולי של חברת ח. סבן חומרי בניין (1994) בע״מ, עם נעילת מכשירים ואימות OTP רב-מכשירי (PC + Samsung)",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
