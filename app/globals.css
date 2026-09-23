@@ -685,3 +685,68 @@ div:nth-of-type(2) > header#chat-header-bar:nth-of-type(1) > div:nth-of-type(1) 
 .sku-searching-glow {
   animation: sku-glow-pulse 1.8s ease-in-out infinite;
 }
+
+/* Focus Mode CSS Styles */
+div:nth-of-type(2) > div:nth-of-type(4) > div:nth-of-type(1) > div:nth-of-type(50) > div#message-item-cwFFca7nIWjyMbS75kmT:nth-of-type(1) > div:nth-of-type(2) > div#message-bubble-cwFFca7nIWjyMbS75kmT:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(1) > span:nth-of-type(1) > div:nth-of-type(1) > img:nth-of-type(1),
+#message-bubble-cwFFca7nIWjyMbS75kmT img {
+  margin-left: 3px;
+  margin-top: 3px;
+  padding-right: 2px;
+  padding-bottom: 2px;
+  padding-left: 2px;
+  padding-top: 3px;
+  margin-right: -36px;
+  margin-bottom: -1px;
+  width: 351px;
+  height: 301px;
+}
+
+div:nth-of-type(2) > div:nth-of-type(4) > div:nth-of-type(1) > div:nth-of-type(50) > div#message-item-cwFFca7nIWjyMbS75kmT:nth-of-type(1) > div:nth-of-type(2) > div#message-bubble-cwFFca7nIWjyMbS75kmT:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(1) > span:nth-of-type(1),
+#message-bubble-cwFFca7nIWjyMbS75kmT span > span {
+  padding-right: 20px;
+  padding-left: 9px;
+  margin-bottom: 13px;
+  width: 450px;
+  height: 328px;
+  background-color: #8daaf5;
+}
+
+div:nth-of-type(2) > div:nth-of-type(4) > div:nth-of-type(1) > div:nth-of-type(50) > div#message-item-cwFFca7nIWjyMbS75kmT:nth-of-type(1) > div:nth-of-type(2) > div#message-bubble-cwFFca7nIWjyMbS75kmT:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(1) > span:nth-of-type(1) > div:nth-of-type(1),
+#message-bubble-cwFFca7nIWjyMbS75kmT span > span > div {
+  width: 390px;
+  height: 292px;
+  margin-bottom: -2px;
+  margin-top: -4px;
+  margin-left: -6px;
+  margin-right: -4px;
+  padding-bottom: -3px;
+  padding-left: -5px;
+  padding-right: -5px;
+  background-color: #9eaff4;
+}
+
+div:nth-of-type(2) > div:nth-of-type(4) > div:nth-of-type(1) > div:nth-of-type(50) > div#message-item-cwFFca7nIWjyMbS75kmT:nth-of-type(1) > div:nth-of-type(2) > div#message-bubble-cwFFca7nIWjyMbS75kmT:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(1) > span:nth-of-type(1) > span:nth-of-type(1),
+#message-bubble-cwFFca7nIWjyMbS75kmT span > span > span:nth-of-type(1) {
+  background-color: #9ba9f5;
+  width: 366px;
+  height: 42px;
+  margin-right: -4px;
+}
+
+div:nth-of-type(2) > div:nth-of-type(4) > div:nth-of-type(1) > div:nth-of-type(50) > div#message-item-cwFFca7nIWjyMbS75kmT:nth-of-type(1) > div:nth-of-type(2) > div#message-bubble-cwFFca7nIWjyMbS75kmT:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(1) > span:nth-of-type(1) > span:nth-of-type(1) > span:nth-of-type(2),
+#message-bubble-cwFFca7nIWjyMbS75kmT span > span > span:nth-of-type(1) > span:nth-of-type(2) {
+  color: #e7a60c;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+div:nth-of-type(2) > div:nth-of-type(4) > div:nth-of-type(1) > div:nth-of-type(50) > div#message-item-cwFFca7nIWjyMbS75kmT:nth-of-type(1) > div:nth-of-type(2) > div#message-bubble-cwFFca7nIWjyMbS75kmT:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > span:nth-of-type(1) > em:nth-of-type(6),
+#message-bubble-cwFFca7nIWjyMbS75kmT em:nth-of-type(6) {
+  font-size: 14px;
+}
+
+div:nth-of-type(2) > div:nth-of-type(4) > div:nth-of-type(1) > div:nth-of-type(50) > div#message-item-cwFFca7nIWjyMbS75kmT:nth-of-type(1) > div:nth-of-type(2) > div#message-bubble-cwFFca7nIWjyMbS75kmT:nth-of-type(2),
+#message-bubble-cwFFca7nIWjyMbS75kmT {
+  width: 686.094px;
+  height: 712px;
+}

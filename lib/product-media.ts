@@ -98,6 +98,38 @@ export const PRODUCT_MEDIA_CATALOG: Record<string, ProductMediaItem> = {
     fallbackAlt: "משטח עץ תקני סבן פקדון",
     aliases: ["משטח סבן", "פקדון משטח", "משטח עץ"],
   },
+  "114260": {
+    sku: "114260",
+    name: "לוח גבס כחול 260 ע׳ 12.50 מ״מ (עמיד מים, אש וקול)",
+    imagePath: "/products/114260.jpg",
+    category: "גבס ופרופילים",
+    fallbackAlt: "לוח גבס כחול 2.60 מ' עמיד מים אש וקול",
+    aliases: ["גבס כחול", "לוח גבס כחול", "גבס אקוסטי כחול", "לוח כחול 260", "114260"],
+  },
+  "1123260": {
+    sku: "1123260",
+    name: "לוח גבס 260 מקצועי",
+    imagePath: "/products/1123260.jpg",
+    category: "גבס ופרופילים",
+    fallbackAlt: "לוח גבס 2.60 מטר מקצועי",
+    aliases: ["1123260", "גבס 260 מקצועי"],
+  },
+  "9550300": {
+    sku: "9550300",
+    name: "מוצר סבן 9550300",
+    imagePath: "/products/9550300.jpg",
+    category: "חומרי בניין",
+    fallbackAlt: "מוצר לוגיסטי סבן מק״ט 9550300",
+    aliases: ["9550300"],
+  },
+  "55122": {
+    sku: "55122",
+    name: "מוצר סבן 55122",
+    imagePath: "/products/55122.jpg",
+    category: "חומרי בניין",
+    fallbackAlt: "מוצר לוגיסטי סבן מק״ט 55122",
+    aliases: ["55122"],
+  },
 }
 
 /**
