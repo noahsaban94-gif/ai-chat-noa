@@ -130,6 +130,30 @@ export const PRODUCT_MEDIA_CATALOG: Record<string, ProductMediaItem> = {
     fallbackAlt: "מוצר לוגיסטי סבן מק״ט 55122",
     aliases: ["55122"],
   },
+  "76133": {
+    sku: "76133",
+    name: "בורג פחפח 13 (1000 יח')",
+    imagePath: "/products/76133.jpg",
+    category: "ברגים ופרזול",
+    fallbackAlt: "בורג פחפח 13 אריזת 1000 יח'",
+    aliases: ["76133", "בורג פחפח 13", "פחפח 13", "בורג פחפח"],
+  },
+  "76206": {
+    sku: "76206",
+    name: "בורג גבס 25 (1000 יח')",
+    imagePath: "/products/76206.jpg",
+    category: "ברגים ופרזול",
+    fallbackAlt: "בורג גבס 25 אריזת 1000 יח'",
+    aliases: ["76206", "בורג גבס 25", "בורגי גבס 25", "בורג גבס"],
+  },
+  "76260": {
+    sku: "76260",
+    name: "ערכת דבש שלישיה 100 יח'",
+    imagePath: "/products/76260.jpg",
+    category: "ברגים ופרזול",
+    fallbackAlt: "ערכת דבש שלישיה 100 יח'",
+    aliases: ["76260", "ערכת דבש", "דבש שלישיה"],
+  },
 }
 
 /**

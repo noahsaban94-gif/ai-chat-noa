@@ -175,10 +175,11 @@ export function MarkdownRenderer({
     }
 
     if (matchedSpans.length > 0) {
-      workingText = workingText.replace(/---\s*(\n\s*🔘[\s\S]*)$/, "").trim()
+      workingText = workingText.replace(/(?:---|___|\*\*\*)\s*(\n\s*🔘[\s\S]*)$/, "").trim()
       for (const span of matchedSpans) {
         workingText = workingText.replace(span, "").trim()
       }
+      workingText = workingText.replace(/(?:---|___|\*\*\*)\s*$/, "").trim()
     }
 
     return { cleanedText: workingText, chips }
@@ -280,6 +281,29 @@ export function MarkdownRenderer({
           return <ProductChatImage key={domNode.attribs.key || src} src={src} alt={alt} />
         }
 
+        // Heading support
+        if (/^h[1-6]$/.test(domNode.name)) {
+          return (
+            <div className="font-bold text-slate-800 text-sm sm:text-base my-2 flex items-center gap-1.5 border-r-2 border-emerald-500 pr-2 py-0.5 bg-slate-50/70 rounded-l" dir="rtl">
+              {domToReact(domNode.children as DOMNode[], parseOptions)}
+            </div>
+          )
+        }
+
+        // Horizontal Rule
+        if (domNode.name === "hr") {
+          return <div className="my-2.5 border-t border-slate-200/80 w-full" />
+        }
+
+        // Paragraph
+        if (domNode.name === "p") {
+          return (
+            <p className="my-1 leading-relaxed text-slate-700 text-xs sm:text-sm" dir="rtl">
+              {domToReact(domNode.children as DOMNode[], parseOptions)}
+            </p>
+          )
+        }
+
         // Ordered List
         if (domNode.name === "ol") {
           return (
@@ -321,6 +345,59 @@ export function MarkdownRenderer({
     let keyIndex = 0
 
     while (remaining.length > 0) {
+      // Check for headings: e.g. ## Title or ### Title
+      const headingMatch = remaining.match(/^(?:^|\n)(#{1,6})\s+([^\n]+)/)
+      if (headingMatch) {
+        const title = headingMatch[2].trim()
+        elements.push(
+          <div key={`h-${keyIndex++}`} className="font-extrabold text-slate-800 text-sm sm:text-base my-2 flex items-center gap-1.5 border-r-2 border-emerald-500 pr-2 py-0.5 bg-slate-50/70 rounded-l" dir="rtl">
+            <span>{title}</span>
+          </div>
+        )
+        remaining = remaining.slice(headingMatch[0].length)
+        continue
+      }
+
+      // Check for horizontal divider: --- or ***
+      const hrMatch = remaining.match(/^(?:^|\n)(?:---|___|\*\*\*)\s*(?:\n|$)/)
+      if (hrMatch) {
+        elements.push(
+          <div key={`hr-${keyIndex++}`} className="my-2.5 border-t border-slate-200/80 w-full" />
+        )
+        remaining = remaining.slice(hrMatch[0].length)
+        continue
+      }
+
+      // Check for list bullet: -- or -
+      const dashMatch = remaining.match(/^(?:^|\n)--\s+/)
+      if (dashMatch) {
+        elements.push("\n• ")
+        remaining = remaining.slice(dashMatch[0].length)
+        continue
+      }
+
+      // Check for mid-sentence double dash: " -- "
+      const midDashMatch = remaining.match(/^(\s+)--(\s+)/)
+      if (midDashMatch) {
+        elements.push(`${midDashMatch[1]}—${midDashMatch[2]}`)
+        remaining = remaining.slice(midDashMatch[0].length)
+        continue
+      }
+
+      // Check for stray double asterisks at start of text that weren't closed
+      const strayStarMatch = remaining.match(/^\*\*(?=[^\n]*$)/)
+      if (strayStarMatch) {
+        remaining = remaining.slice(strayStarMatch[0].length)
+        continue
+      }
+
+      // Check for stray ## at start
+      const strayHashMatch = remaining.match(/^##+\s*/)
+      if (strayHashMatch) {
+        remaining = remaining.slice(strayHashMatch[0].length)
+        continue
+      }
+
       // Check for inline code
       const codeMatch = remaining.match(/^`([^`]+)`/)
       if (codeMatch) {
@@ -384,7 +461,7 @@ export function MarkdownRenderer({
       }
 
       // Find next special character or add remaining text
-      const nextSpecial = remaining.search(/[`*[\]()!]/)
+      const nextSpecial = remaining.search(/[`*[\]()!#\n-]/)
       if (nextSpecial === -1) {
         elements.push(remaining)
         break
@@ -406,6 +483,64 @@ export function MarkdownRenderer({
     let keyIndex = 0
 
     while (remaining.length > 0) {
+      // Check for headings: e.g. ## Title or ### Title
+      const headingMatch = remaining.match(/^(?:^|\n)(#{1,6})\s+([^\n]+)/)
+      if (headingMatch) {
+        const title = headingMatch[2].trim()
+        const words = title.split(/(\s+)/)
+        elements.push(
+          <div key={`anim-h-${keyIndex++}`} className="font-extrabold text-slate-800 text-sm sm:text-base my-2 flex items-center gap-1.5 border-r-2 border-emerald-500 pr-2 py-0.5 bg-slate-50/70 rounded-l" dir="rtl">
+            {words.map((w, i) => {
+              if (w.match(/\s+/)) return w
+              if (!w) return null
+              return <AnalysisWordSpan key={`hw-${keyIndex}-${i}`} word={w} />
+            })}
+          </div>
+        )
+        remaining = remaining.slice(headingMatch[0].length)
+        continue
+      }
+
+      // Check for horizontal divider: --- or ***
+      const hrMatch = remaining.match(/^(?:^|\n)(?:---|___|\*\*\*)\s*(?:\n|$)/)
+      if (hrMatch) {
+        elements.push(
+          <div key={`anim-hr-${keyIndex++}`} className="my-2.5 border-t border-slate-200/80 w-full" />
+        )
+        remaining = remaining.slice(hrMatch[0].length)
+        continue
+      }
+
+      // Check for list bullet: -- or -
+      const dashMatch = remaining.match(/^(?:^|\n)--\s+/)
+      if (dashMatch) {
+        elements.push("\n• ")
+        remaining = remaining.slice(dashMatch[0].length)
+        continue
+      }
+
+      // Check for mid-sentence double dash: " -- "
+      const midDashMatch = remaining.match(/^(\s+)--(\s+)/)
+      if (midDashMatch) {
+        elements.push(`${midDashMatch[1]}—${midDashMatch[2]}`)
+        remaining = remaining.slice(midDashMatch[0].length)
+        continue
+      }
+
+      // Check for stray double asterisks at start of text that weren't closed
+      const strayStarMatch = remaining.match(/^\*\*(?=[^\n]*$)/)
+      if (strayStarMatch) {
+        remaining = remaining.slice(strayStarMatch[0].length)
+        continue
+      }
+
+      // Check for stray ## at start
+      const strayHashMatch = remaining.match(/^##+\s*/)
+      if (strayHashMatch) {
+        remaining = remaining.slice(strayHashMatch[0].length)
+        continue
+      }
+
       // Check for inline code
       const codeMatch = remaining.match(/^`([^`]+)`/)
       if (codeMatch) {
@@ -483,7 +618,7 @@ export function MarkdownRenderer({
       }
 
       // Find next special character or add remaining text
-      const nextSpecial = remaining.search(/[`*[\]()!]/)
+      const nextSpecial = remaining.search(/[`*[\]()!#\n-]/)
       if (nextSpecial === -1) {
         const words = remaining.split(/(\s+)/)
         elements.push(
