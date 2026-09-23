@@ -330,11 +330,17 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
   )
 
   const handleFileSelect = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
       playClickSound()
 
       const file = e.target.files?.[0]
-      if (file && file.type.startsWith("image/")) {
+      if (!file) return
+
+      const isAudio =
+        file.type.startsWith("audio/") ||
+        /\.(ogg|opus|mp3|wav|m4a|aac|weba)$/i.test(file.name)
+
+      if (file.type.startsWith("image/")) {
         const reader = new FileReader()
         reader.onload = (event) => {
           setUploadedImage(event.target?.result as string)
@@ -342,10 +348,39 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
           setTimeout(() => setShowImageBounce(false), 400)
         }
         reader.readAsDataURL(file)
+      } else if (isAudio) {
+        setIsTranscribing(true)
+        try {
+          const formData = new FormData()
+          formData.append("audio", file, file.name || "voice-note.ogg")
+
+          const res = await fetch("/api/transcribe", {
+            method: "POST",
+            body: formData,
+          })
+
+          if (res.ok) {
+            const data = await res.json()
+            if (data.text && data.text.trim()) {
+              const prefix = baseTextRef.current ? baseTextRef.current.trim() + " " : ""
+              const fullText = `${prefix}🎙️ [הודעה קולית / WhatsApp Voice]: "${data.text.trim()}"`
+              setValue(fullText)
+              if (textareaRef.current) {
+                textareaRef.current.value = fullText
+                textareaRef.current.focus()
+                handleInput()
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Audio transcription error:", err)
+        } finally {
+          setIsTranscribing(false)
+        }
       }
       e.target.value = ""
     },
-    [playClickSound],
+    [playClickSound, handleInput],
   )
 
   const removeImage = useCallback(() => {
@@ -474,10 +509,10 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,audio/*,.ogg,.opus,.m4a,.mp3,.wav,.aac,.weba"
               onChange={handleFileSelect}
               className="hidden"
-              aria-label="Upload image"
+              aria-label="צרף תמונה או הודעה קולית מוואטסאפ"
             />
 
             <div className="relative">
@@ -514,7 +549,8 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
               disabled={isStreaming || disabled}
               size="icon"
               className="h-9 w-9 shrink-0 bg-zinc-100 hover:bg-zinc-200 text-stone-700 rounded-full"
-              aria-label="Attach image"
+              aria-label="צרף תמונה או הודעה קולית מוואטסאפ"
+              title="צרף תמונה או הודעה קולית מוואטסאפ (Voice-to-Order)"
             >
               <Paperclip className="w-4 h-4" />
             </Button>

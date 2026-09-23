@@ -28,35 +28,21 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(arrayBuffer)
     const base64Data = buffer.toString("base64")
     const rawMime = audioFile.type || "audio/webm"
-    const mimeType = rawMime.split(";")[0].trim() || "audio/webm"
+    let mimeType = rawMime.split(";")[0].trim() || "audio/webm"
+    // Normalize audio mime types for Gemini multimodal input
+    if (mimeType.includes("opus") || mimeType.includes("ogg")) {
+      mimeType = "audio/ogg"
+    } else if (mimeType.includes("mp4") || mimeType.includes("m4a")) {
+      mimeType = "audio/mp4"
+    } else if (mimeType.includes("mpeg") || mimeType.includes("mp3")) {
+      mimeType = "audio/mp3"
+    } else if (mimeType.includes("wav")) {
+      mimeType = "audio/wav"
+    }
 
     const ai = getGenAI()
     let response
     try {
-      response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                inlineData: {
-                  data: base64Data,
-                  mimeType,
-                },
-              },
-              {
-                text: `תמלל באופן מדויק ונאמן למקור את הדיבור בעברית מהקלטת השמע הזו.
-החזר אך ורק את הטקסט המדויק שנאמר ללא שום הערות, פניות, הקדמות, מרכאות או תוספות.
-אם ההקלטה שקטה או שאין בה דיבור ברור, החזר מחרוזת ריקה לחלוטין (אל תכתוב 'אין דיבור' או 'ההקלטה שקטה').
-אם נאמרים מונחים הקשורים לבנייה או עבודה של ח. סבן חומרי בניין (כגון: בלות, טיט, מלט, שקים, גבס, עלי, חכמת, ראמי, מרצדס מנוף, איסוזו חלוקה, סניף התלמיד, סניף החרש, משטחי עץ, פקדון 60060), הקפד על איות עברי נכון ומדויק.`,
-              },
-            ],
-          },
-        ],
-      })
-    } catch (primaryErr) {
-      console.warn("Primary transcribe model failed, using fallback:", primaryErr)
       response = await ai.models.generateContent({
         model: "gemini-3.8-flash",
         contents: [
@@ -70,7 +56,40 @@ export async function POST(req: NextRequest) {
                 },
               },
               {
-                text: `תמלל במדויק את הדיבור בעברית מהקלטת שמע זו. החזר רק את הטקסט המתומלל בלבד ללא שום הערות.`,
+                text: `אתה מנוע תמלול קולי מתקדם (Voice-to-Order) של חברת ח. סבן חומרי בניין (1994) בע״מ, המיועד לפענוח הקלטות קוליות והודעות וואטסאפ מנהגים, קבלנים וסדרני עבודה (ראמי, חכמת, עלי, וקבלנים בשטח).
+
+הוראות תמלול מחייבות:
+1. תמלל באופן מדויק, נאמן ומלא את הדיבור מהקלטת השמע הזו.
+2. מודל Gemini תומך בהבנת עברית מדוברת, ערבית מדוברת (כולל להג מקומי, משולש, ערבית-עברית מעורבת כפי שמקובל בענף הבנייה), וסלנג אתרי בנייה.
+3. הקפד על דיוק מירבי במונחים המקצועיים של ח. סבן:
+   - מוצרים: בלות חול (מק"ט 11501), בלות סומסום (11502), טיט מוכן (11503), מלט אפור נשר 25 ק"ג (מק"ט 10002 - כל שק מלט הוא 25 ק"ג, 40 שקים במשטח = 1 טון), טיח תרמי, דבק קרמיקה 116/109, לוחות גבס לבן/ירוק, ניצבים, מסלולים, בלוקים, ברזל.
+   - פקדונות: שק גדול פקדון (60002) ביחס 1:1 על כל בלה, משטח סבן פקדון (60060) על כל 40 שקי מלט/דבק.
+   - שמות ואתרים: ראמי, חכמת (מרצדס מנוף), עלי (איסוזו חלוקה), אורן (סניף 4 החרש), תמיר/דורון (סניף 1 התלמיד), הראל, ורד, גליה.
+   - יישובים: כפר שמריהו, הרצליה פיתוח, הוד השרון, רמת השרון, תל אביב, רעננה, נתניה, פתח תקווה.
+4. אם נאמרות מילים בערבית (כמו: שוואל/שואיל, רמל, סמסם, כמינט, טיין, משרוע, אסמנת, כלאט, ורד, וכו'), תרגם אותן במדויק להקשר העברי של ההזמנה או תמלל את משמעותן הברורה לעברית כדי שנועה תוכל לנרמל מיד לכרטיס סידור.
+5. החזר אך ורק את הטקסט המדויק שנאמר ללא שום הערות מטא, פניות, הקדמות, מרכאות או תוספות.
+6. אם ההקלטה שקטה לחלוטין או שאין בה דיבור, החזר מחרוזת ריקה.`,
+              },
+            ],
+          },
+        ],
+      })
+    } catch (primaryErr) {
+      console.warn("Primary transcribe model failed, using fallback:", primaryErr)
+      response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                inlineData: {
+                  data: base64Data,
+                  mimeType,
+                },
+              },
+              {
+                text: `תמלל במדויק את הדיבור מהקלטת שמע זו (עברית / ערבית / סלנג בנייה) עבור הזמנת חומרי בניין בסבן. החזר רק את הטקסט המתומלל בלבד ללא שום הערות.`,
               },
             ],
           },
