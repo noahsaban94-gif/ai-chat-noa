@@ -31,7 +31,7 @@ function ProductChatImage({ src, alt }: { src: string; alt?: string }) {
     if (match) {
       const basePath = match[1]
       const currentExt = match[2].toLowerCase()
-      const candidateExts = ["png", "jpg", "jpeg", "webp", "svg"]
+      const candidateExts = ["jpg", "png", "jpeg", "webp", "svg"]
       const nextExt = candidateExts.find((ext) => ext !== currentExt && !triedExts.includes(ext))
       if (nextExt) {
         setTriedExts((prev) => [...prev, currentExt])
@@ -53,6 +53,7 @@ function ProductChatImage({ src, alt }: { src: string; alt?: string }) {
         alt={altTitle}
         className="w-full h-auto object-cover max-h-64 transition-transform duration-300 group-hover:scale-105"
         loading="lazy"
+        referrerPolicy="no-referrer"
         onError={handleError}
       />
       {altTitle && (

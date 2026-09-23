@@ -21,7 +21,7 @@ export const PRODUCT_MEDIA_CATALOG: Record<string, ProductMediaItem> = {
   "10002": {
     sku: "10002",
     name: 'מלט אפור 25 ק"ג נשר',
-    imagePath: "/products/10002.png",
+    imagePath: "/products/10002.jpg",
     category: "מלט וקשירה",
     fallbackAlt: "שק מלט אפור 25 קג נשר",
     aliases: ["מלט אפור", "מלט", "שק מלט", "נשר", "מלט 25", "אסמנת"],

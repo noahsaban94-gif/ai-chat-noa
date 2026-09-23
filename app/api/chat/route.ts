@@ -663,7 +663,7 @@ ${matchedTrainingVideos.slice(0, 2).map((v) => `* **${v.name}**
 }
 `
 
-    const productMediaPrompt = buildProductMediaPrompt()
+    const productMediaPrompt = await buildProductMediaPrompt()
 
     const verifiedIdentityBanner = verifiedUser
       ? `
