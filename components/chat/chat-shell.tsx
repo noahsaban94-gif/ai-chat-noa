@@ -327,10 +327,34 @@ export function ChatShell() {
           } = {}
 
           try {
-            errData = await response.json()
+            // Read stream only once to prevent "body stream already read" TypeError
+            const rawBody = await response.text()
+            try {
+              errData = JSON.parse(rawBody)
+            } catch {
+              errData = { message: rawBody }
+            }
           } catch {
-            const txt = await response.text()
-            errData = { message: txt }
+            errData = { message: `שגיאת תקשורת (${response.status})` }
+          }
+
+          // Unpack nested JSON error message if present (e.g. from upstream Gemini API)
+          let finalErrorMessage = errData.message || errData.error || `שגיאת אימות / תקשורת (${response.status})`
+          if (typeof finalErrorMessage === "string" && finalErrorMessage.startsWith("{")) {
+            try {
+              const parsed = JSON.parse(finalErrorMessage)
+              if (parsed?.error?.message) {
+                finalErrorMessage = parsed.error.message
+              }
+            } catch {}
+          }
+          if (
+            typeof finalErrorMessage === "string" &&
+            (finalErrorMessage.includes("503") ||
+              finalErrorMessage.includes("UNAVAILABLE") ||
+              finalErrorMessage.includes("high demand"))
+          ) {
+            finalErrorMessage = "עומס רגעי בענן המודלים. המערכת שומרת על הנתונים שלך, אנא לחץ שוב 'שלח'."
           }
 
           // במידה ונדרש אימות מכשיר נוסף (OTP / Device Pairing)
@@ -349,7 +373,7 @@ export function ChatShell() {
             return
           }
 
-          throw new Error(errData.message || errData.error || `שגיאת אימות / תקשורת (${response.status})`)
+          throw new Error(finalErrorMessage)
         }
 
         const reader = response.body?.getReader()

@@ -76,9 +76,12 @@ function checkLocalProductImage(cleanSku: string): { localUrl: string | null; is
 
       if (fs.existsSync(targetCandidate)) {
         const stats = fs.statSync(targetCandidate)
-        return {
-          localUrl: `/products/${cleanSku}.${ext}`,
-          isReal: ext !== "svg" && stats.size > 100,
+        // Skip empty or 0-byte placeholder files
+        if (stats.size > 100) {
+          return {
+            localUrl: `/products/${cleanSku}.${ext}`,
+            isReal: ext !== "svg" && stats.size > 1000,
+          }
         }
       }
     }
