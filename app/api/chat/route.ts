@@ -9,6 +9,7 @@ import {
   detectAndExtractLearningTrigger,
   saveLearnedFact,
   getActiveLearnedKnowledge,
+  ensureLearnedKnowledgeBootstrapped,
 } from "@/lib/learned-memory"
 import {
   doc,
@@ -634,6 +635,9 @@ const generateMultiProviderFallback = generateWithProviderFallback;
  */
 export async function POST(req: Request) {
   try {
+    // אתחול והבטחת קיום קולקציית הזיכרון בענן כבר בפנייה הראשונה
+    await ensureLearnedKnowledgeBootstrapped()
+
     const body = await req.json().catch(() => ({}))
     const { messages, currentDate, currentTime, userId, deviceId } = body
 
@@ -1021,24 +1025,21 @@ ${matchedTrainingVideos.slice(0, 2).map((v) => `* **${v.name}**
     const targetedProductSnippet = await buildTargetedProductMediaSnippet(latestUserMessage)
 
     // 🧠 מנגנון זיכרון ארוך-טווח ולמידה רציפה משיחה (Autonomous Long-Term Memory)
-    const learningTrigger = detectAndExtractLearningTrigger(latestUserMessage)
+    const trigger = detectAndExtractLearningTrigger(latestUserMessage)
     let learningConfirmationNote = ""
 
-    if (learningTrigger.isLearningTrigger && learningTrigger.cleanedRule) {
+    if (trigger && trigger.isLearningTrigger && trigger.rule) {
+      console.log("🎯 זוהה טריגר לימוד, מתחיל שמירה:", trigger)
       try {
-        await saveLearnedFact(
-          learningTrigger.cleanedRule,
-          learningTrigger.category,
-          learningTrigger.entity
-        )
+        const savedDocId = await saveLearnedFact(trigger.rule, trigger.category, trigger.entity)
         learningConfirmationNote = `
 ### ⚡ אירוע למידה בזמן אמת מהודעה זו:
-- ראמי לימד אותך כרגע כלל חדש: "${learningTrigger.cleanedRule}"
-- קטגוריה שסווגה: ${learningTrigger.category}${learningTrigger.entity ? ` | ישות מזוהה: ${learningTrigger.entity}` : ""}
-- הכלל נצרב ונשמר בהצלחה ב-Firestore במאגר הזיכרון לכל השיחות הבאות.
-- **הנחיית אישור לראמי:** אשרי לו בחום ובביטחון שהכלל נצרב בזיכרון הקבוע שלך (למשל: "רשמתי לפניי וצרבתי בזיכרון הקבוע — החל מעכשיו אני איישם כלל זה בכל סידורי העבודה והמענה").`
+- ראמי לימד אותך כרגע כלל חדש: "${trigger.rule}"
+- קטגוריה שסווגה: ${trigger.category}${trigger.entity ? ` | ישות מזוהה: ${trigger.entity}` : ""}
+- הכלל נצרב ונשמר בהצלחה בענן Firestore (מזהה מסמך: ${savedDocId}) במאגר הזיכרון לכל השיחות הבאות.
+- **הנחיית אישור לראמי:** אשרי לו בחום ובביטחון שהכלל נצרב בזיכרון הקבוע שלך בענן (למשל: "רשמתי לפניי וצרבתי בזיכרון הקבוע — החל מעכשיו אני איישם כלל זה בכל סידורי העבודה והמענה").`
       } catch (err) {
-        console.warn("Error saving learned fact from chat route:", err)
+        console.error("❌ שגיאה בשמירת כלל חדש בשיחה ל-Firestore:", err)
       }
     }
 
@@ -1047,7 +1048,7 @@ ${matchedTrainingVideos.slice(0, 2).map((v) => `* **${v.name}**
     let learnedMemoryPrompt = ""
     if (activeLearnedRules.length > 0) {
       learnedMemoryPrompt = `
-### 🧠 ידע מצטבר שנלמד משיחות קודמות עם ראמי (Learned Memory):
+### 🧠 ידע ונסיון נצבר שנלמד משיחות קודמות עם ראמי (Learned Memory):
 להלן כללים עסקיים, עדכוני לקוחות, מחירונים והנחיות שטח שראמי לימד אותך ישירות בצ'אט לאורך הזמן. עליך לציית לכללים אלו בעדיפות עליונה בכל מענה וסידור עבודה:
 ${activeLearnedRules.join("\n")}
 ${learningConfirmationNote}

@@ -221,6 +221,10 @@
     "/authorized_users/{userId}": {
       "schema": "AuthorizedUser",
       "description": "Authorized operators and device binding profiles"
+    },
+    "/learned_knowledge/{factId}": {
+      "schema": "LearnedKnowledge",
+      "description": "Persistent learned knowledge and autonomous facts from Rami"
     }
   }
 }

@@ -1,92 +1,114 @@
+import { initializeApp, getApps, getApp } from "firebase/app"
 import {
+  getFirestore,
   collection,
-  doc,
-  setDoc,
   addDoc,
   getDocs,
   query,
   where,
-  orderBy,
-  limit as firestoreLimit,
   serverTimestamp,
-  increment,
-  type Timestamp,
+  limit as firestoreLimit,
 } from "firebase/firestore"
-import { db } from "./firebase-auth"
 import { HISTORICAL_63_CLIENTS } from "./historical-clients"
 
-export type LearnedCategory = "client" | "pricing" | "driver" | "safety" | "general"
+// הגדרות Firebase מחייבות וסביבת Node.js Server Runtime
+const firebaseConfig = {
+  projectId: "gen-lang-client-0128713331",
+  appId: "1:1091656935060:web:a7c1fba39af94a20fc3681",
+  apiKey: "AIzaSyDyK1mBNz5ynUw-YAY1qadVh1XQXHVLbqM",
+  authDomain: "gen-lang-client-0128713331.firebaseapp.com",
+}
 
-export interface LearnedKnowledgeDoc {
+// אתחול עצמאי ומובטח של Firebase Client התואם סביבת Node.js (ללא שום תלות ב-window)
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)
+export const serverDb = getFirestore(app)
+
+export interface LearnedFact {
   id?: string
   rule: string
-  category: LearnedCategory
-  entity?: string
+  category: string
+  entity: string
   learnedFrom: string
   isActive: boolean
-  createdAt?: Timestamp | ReturnType<typeof serverTimestamp> | Date | null
+  createdAt: any
 }
+
+// ממשק תואם לאחור עבור בדיקות וטריגרים
+export type LearnedCategory = "client" | "pricing" | "driver" | "safety" | "general"
+export type LearnedKnowledgeDoc = LearnedFact
 
 export interface ExtractedLearningTrigger {
   isLearningTrigger: boolean
+  rule: string
+  cleanedRule?: string // תאימות לאחור
+  category: string
+  entity: string
   rawTrigger?: string
-  cleanedRule?: string
-  category: LearnedCategory
-  entity?: string
 }
 
-const LEARNED_CONVERSATION_ID = "system_learned_knowledge"
-const LEARNED_SUBCOLLECTION = "messages"
-
-// זיכרון מקומי מהיר וגיבוי (In-memory fallback cache) למקרה של עיכוב רשת או חוסר חיבור
-const inMemoryLearnedRules: LearnedKnowledgeDoc[] = [
-  {
-    id: "init_seed_1",
-    rule: "שק מלט אפור נשר (מק״ט 10002) שוקל תמיד 25 ק״ג בלבד, ומשטח שלם מונה 40 שקים (1,000 ק״ג / 1 טון) ומחייב פקדון משטח 60060.",
-    category: "general",
-    entity: "סניף 4 החרש",
-    learnedFrom: "rami_chat",
-    isActive: true,
-  },
-  {
-    id: "init_seed_2",
-    rule: "על כל בלה של אגרגטים (חול, סומסום, טיט, חצץ) מחייבים תמיד פקדון שק גדול 60002 ביחס 1:1, למעט פריקת פלטה ידנית של עלי.",
-    category: "pricing",
-    entity: "חכמת / עלי",
-    learnedFrom: "rami_chat",
-    isActive: true,
-  }
-]
+let isBootstrapped = false
 
 /**
- * מזהה האם הודעת המשתמש מכילה פקודת לימוד מראמי, מחלצת את הכלל ומסווגת קטגוריה וישות.
- *
- * ביטויים מזהים נתמכים:
- * - "תזכרי ש", "תזכרי:", "תזכרי ש..."
- * - "כלל חדש:", "כלל חדש"
- * - "עדכון לגבי", "עדכון לקוח:", "עדכון מחירון:"
- * - "תרשמי לפנייך", "תרשמי לפנייך ש..."
- * - "מעכשיו", "מעכשיו כל..."
- * - "שים לב:", "שימי לב:", "שימי לב ש..."
- * - "נועה, תזכרי...", "נועה תרשמי..."
+ * שמירה פיזית מאובטחת בענן ב-Firestore
+ */
+export async function saveLearnedFact(
+  rule: string,
+  category: string = "general",
+  entity: string = ""
+): Promise<string> {
+  const cleanRule = rule.trim()
+  const cleanCategory = (category || "general").trim()
+  const cleanEntity = (entity || "").trim()
+
+  console.log("🔥 [saveLearnedFact] מתחיל שמירה בענן:", {
+    rule: cleanRule,
+    category: cleanCategory,
+    entity: cleanEntity,
+  })
+
+  try {
+    const colRef = collection(serverDb, "learned_knowledge")
+    const docRef = await addDoc(colRef, {
+      rule: cleanRule,
+      category: cleanCategory,
+      entity: cleanEntity,
+      learnedFrom: "rami_chat",
+      isActive: true,
+      createdAt: serverTimestamp(),
+    })
+
+    console.log(`✅ [saveLearnedFact] נשמר בהצלחה ב-Firestore בענן! ID: ${docRef.id}`)
+    return docRef.id
+  } catch (error) {
+    console.error("❌ [saveLearnedFact] שגיאה קריטית בשמירה ל-Firestore:", error)
+    throw error
+  }
+}
+
+/**
+ * פונקציית זיהוי וחילוץ גמישה של פקודות וטריגרי לימוד מראמי
+ * תומכת בביטויים מגוונים:
+ * "תזכרי ש", "תזכרי:", "תזכרי", "כלל חדש:", "עדכון לגבי", "עדכון לקוח:", "החדש של", "תרשמי לפנייך", "מעכשיו", "שימי לב:"
  */
 export function detectAndExtractLearningTrigger(prompt: string): ExtractedLearningTrigger {
   if (!prompt || typeof prompt !== "string") {
-    return { isLearningTrigger: false, category: "general" }
+    return { isLearningTrigger: false, rule: "", category: "general", entity: "" }
   }
 
   const cleanPrompt = prompt.trim()
 
-  // ביטויים רגולריים לזיהוי טריגרים (כולל פניות מנומסות לנועה וגרסאות זכר/נקבה)
+  // ביטויים רגולריים לחילוץ טריגרים
   const triggerPatterns: { regex: RegExp; name: string }[] = [
-    { regex: /^(?:נועה[,\s]+)?(?:תזכרי\s*ש|תזכרי\s*:|תזכרי\s+כי)\s*/i, name: "תזכרי ש" },
-    { regex: /^(?:נועה[,\s]+)?(?:כלל\s*חדש\s*:?|חוק\s*חדש\s*:?)\s*/i, name: "כלל חדש" },
-    { regex: /^(?:נועה[,\s]+)?(?:עדכון\s*(?:לגבי|עבור|לקוח|מחירון|נהג|בטיחות)\s*:?)\s*/i, name: "עדכון לגבי" },
+    { regex: /^(?:נועה[,\s]+)?(?:תזכרי\s*ש|תזכרי\s*:|תזכרי\s+כי|תזכרי)\s*/i, name: "תזכרי" },
+    { regex: /^(?:נועה[,\s]+)?(?:כלל\s*חדש\s*:?|חוק\s*חדש\s*:?)\s*/i, name: "כלל חדש:" },
+    { regex: /^(?:נועה[,\s]+)?(?:עדכון\s*לקוח\s*:?)\s*/i, name: "עדכון לקוח:" },
+    { regex: /^(?:נועה[,\s]+)?(?:עדכון\s*(?:לגבי|עבור|מחירון|נהג|בטיחות|אתר)\s*:?)\s*/i, name: "עדכון לגבי" },
+    { regex: /^(?:נועה[,\s]+)?(?:החדש\s*של\s*:?)\s*/i, name: "החדש של" },
     { regex: /^(?:נועה[,\s]+)?(?:תרשמי\s*(?:לפנייך|בזיכרון|אצלך)\s*(?:ש|:)?)\s*/i, name: "תרשמי לפנייך" },
     { regex: /^(?:נועה[,\s]+)?(?:מעכשיו[,\s:]+|החל\s*מעכשיו[,\s:]+)\s*/i, name: "מעכשיו" },
-    { regex: /^(?:נועה[,\s]+)?(?:שימי\s*לב\s*:|שים\s*לב\s*:|שימי\s*לב\s*ש)\s*/i, name: "שים לב:" },
-    // זיהוי בתוך משפט (לא רק בתחילת מחרוזת)
-    { regex: /(?:תזכרי\s*ש|תזכרי\s*:|כלל\s*חדש\s*:|תרשמי\s*לפנייך\s*:?|מעכשיו\s*:)/i, name: "טריגר משובץ" },
+    { regex: /^(?:נועה[,\s]+)?(?:שימי\s*לב\s*:|שים\s*לב\s*:|שימי\s*לב\s*ש)\s*/i, name: "שימי לב:" },
+    // חיפוש בתוך משפט (לא רק בתחילת מחרוזת)
+    { regex: /(?:תזכרי\s*ש|תזכרי\s*:|כלל\s*חדש\s*:|תרשמי\s*לפנייך\s*:?|מעכשיו\s*:|עדכון\s*לקוח\s*:)/i, name: "טריגר משובץ" },
   ]
 
   let matchedTrigger: string | null = null
@@ -95,45 +117,42 @@ export function detectAndExtractLearningTrigger(prompt: string): ExtractedLearni
   for (const { regex, name } of triggerPatterns) {
     if (regex.test(cleanPrompt)) {
       matchedTrigger = name
-      // הסרת הטריגר מההתחלה כדי לקבל את הכלל הנקי
       extractedRuleText = cleanPrompt.replace(regex, "").trim()
       break
     }
   }
 
   if (!matchedTrigger) {
-    return { isLearningTrigger: false, category: "general" }
+    return { isLearningTrigger: false, rule: "", category: "general", entity: "" }
   }
 
-  // ניקוי סימני פיסוק מיותרים בהתחלה ובסוף
+  // ניקוי סימני פיסוק מהקצוות
   extractedRuleText = extractedRuleText
     .replace(/^[:\-–—\s,]+/, "")
     .replace(/[:\-–—\s]+$/, "")
     .trim()
 
   if (extractedRuleText.length < 3) {
-    return { isLearningTrigger: false, category: "general" }
+    return { isLearningTrigger: false, rule: "", category: "general", entity: "" }
   }
 
-  // סיווג קטגוריה אוטומטי
   const category = classifyCategory(extractedRuleText)
-
-  // חילוץ ישות אם קיימת
-  const entity = extractEntity(extractedRuleText)
+  const entity = extractEntity(extractedRuleText) || ""
 
   return {
     isLearningTrigger: true,
-    rawTrigger: matchedTrigger,
+    rule: extractedRuleText,
     cleanedRule: extractedRuleText,
     category,
     entity,
+    rawTrigger: matchedTrigger,
   }
 }
 
 /**
- * סיווג קטגוריה חכם לפי מילות מפתח בעולם הבנייה והתפעול של סבן
+ * סיווג קטגוריה חכם לפי מילות מפתח
  */
-function classifyCategory(text: string): LearnedCategory {
+function classifyCategory(text: string): string {
   const lower = text.toLowerCase()
 
   // 1. תמחור וכספים (pricing)
@@ -165,14 +184,14 @@ function classifyCategory(text: string): LearnedCategory {
 
   // 4. לקוחות ואתרים (client)
   if (
-    /לקוח|אתר|קבלן|קומקס|אורניל|סבן|חכמת|פרויקט|מזמין|מנהל עבודה|איש קשר/i.test(
+    /לקוח|אתר|קבלן|קומקס|גלעד קדם|ד\.?ניב|חכמת|פרויקט|מזמין|מנהל עבודה|איש קשר/i.test(
       lower
     ) ||
     HISTORICAL_63_CLIENTS.some(
       (c) =>
         lower.includes(c.name.toLowerCase()) ||
-        lower.includes(c.contactName.toLowerCase()) ||
-        lower.includes(c.comaxId)
+        (c.contactName && lower.includes(c.contactName.toLowerCase())) ||
+        (c.comaxId && lower.includes(c.comaxId))
     )
   ) {
     return "client"
@@ -182,9 +201,15 @@ function classifyCategory(text: string): LearnedCategory {
 }
 
 /**
- * חילוץ שם הישות (לקוח, נהג, סניף) מתוך הטקסט
+ * חילוץ שם הישות (כגון "גלעד קדם", "ד.ניב", "חכמת", "עלי", וכו')
  */
 function extractEntity(text: string): string | undefined {
+  // בדיקה של לקוחות בולטים מבוקשים
+  if (/גלעד\s*קדם/i.test(text)) return "גלעד קדם"
+  if (/ד\.?\s*ניב/i.test(text)) return "ד.ניב"
+  if (/חכמת/i.test(text)) return "חכמת"
+  if (/עלי/i.test(text)) return "עלי"
+
   // בדיקה מול 63 הלקוחות הרשמיים
   for (const client of HISTORICAL_63_CLIENTS) {
     if (text.includes(client.name)) return client.name
@@ -196,11 +221,9 @@ function extractEntity(text: string): string | undefined {
     }
   }
 
-  // גורמים קבועים במערכת
+  // גורמים קבועים במערכת סבן
   const knownEntities = [
     "אורניל",
-    "חכמת",
-    "עלי",
     "סניף 4 החרש",
     "סניף 1 התלמיד",
     "סניף 4",
@@ -222,7 +245,7 @@ function extractEntity(text: string): string | undefined {
   }
 
   // חילוץ תבניות כגון "לגבי [שם]" או "עבור [שם]"
-  const matchPattern = text.match(/(?:לגבי|עבור|של|לקוח)\s+([א-תA-Za-z0-9"'-]{2,20}(?:\s+[א-תA-Za-z0-9"'-]{2,20})?)/)
+  const matchPattern = text.match(/(?:לגבי|עבור|של|לקוח)\s+([א-תA-Za-z0-9"'.]{2,20}(?:\s+[א-תA-Za-z0-9"'.]{2,20})?)/)
   if (matchPattern && matchPattern[1]) {
     return matchPattern[1].trim()
   }
@@ -231,84 +254,77 @@ function extractEntity(text: string): string | undefined {
 }
 
 /**
- * שומר עובדה או כלל חדש שנלמד מראמי בקולקציית learned_knowledge ב-Firestore.
- *
- * @param text תוכן הכלל או העובדה
- * @param category קטגוריה ('client' | 'pricing' | 'driver' | 'safety' | 'general')
- * @param entity שם הישות (אופציונלי)
- * @returns מזהה המסמך שנשמר (Document ID)
+ * פונקציית אתחול ראשוני:
+ * אם הקולקציה ריקה, מייצרת מיד מסמך ראשון:
+ * rule: "גלעד קדם (הוד השרון) — מספר טלפון מעודכן באתר: 054-9998877", category: "client", entity: "גלעד קדם".
+ * גורמת לקולקציה להופיע ב-Firebase Console מיידית!
  */
-export async function saveLearnedFact(
-  text: string,
-  category: LearnedCategory = "general",
-  entity?: string
-): Promise<string> {
-  const cleanRule = text.trim()
-  const fallbackId = `learned_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
-
-  // שמירה מיידית בזיכרון המקומי לזמינות אפס-שיהוי
-  const memoryDoc: LearnedKnowledgeDoc = {
-    id: fallbackId,
-    rule: cleanRule,
-    category,
-    entity: entity || undefined,
-    learnedFrom: "rami_chat",
-    isActive: true,
-    createdAt: new Date(),
-  }
-  inMemoryLearnedRules.unshift(memoryDoc)
-
-  if (!db) {
-    return fallbackId
-  }
+export async function ensureLearnedKnowledgeBootstrapped(): Promise<boolean> {
+  if (isBootstrapped) return true
 
   try {
-    const parentDocRef = doc(db, "conversations", LEARNED_CONVERSATION_ID)
-    const colRef = collection(parentDocRef, LEARNED_SUBCOLLECTION)
-    const docData: Record<string, unknown> = {
-      rule: cleanRule,
-      category,
-      learnedFrom: "rami_chat",
-      isActive: true,
-      createdAt: serverTimestamp(),
+    const colRef = collection(serverDb, "learned_knowledge")
+    const snap = await getDocs(query(colRef, firestoreLimit(1)))
+
+    if (snap.empty) {
+      console.log("🌱 [ensureLearnedKnowledgeBootstrapped] הקולקציה learned_knowledge ריקה. מבצע אתחול מסמך ראשון בענן...")
+      await saveLearnedFact(
+        "גלעד קדם (הוד השרון) — מספר טלפון מעודכן באתר: 054-9998877",
+        "client",
+        "גלעד קדם"
+      )
+      console.log("🌱 [ensureLearnedKnowledgeBootstrapped] מסמך ראשון נשמר בהצלחה! הקולקציה זמינה ב-Firebase Console.")
+    } else {
+      console.log("🌱 [ensureLearnedKnowledgeBootstrapped] הקולקציה learned_knowledge קיימת ומאוכלסת ב-Firestore.")
     }
 
-    if (entity) {
-      docData.entity = entity
-    }
-
-    const docRef = await addDoc(colRef, docData)
-    memoryDoc.id = docRef.id
-
-    // עדכון מסמך האב של מאגר הזיכרון
-    await setDoc(
-      parentDocRef,
-      {
-        type: "learned_knowledge_store",
-        updatedAt: serverTimestamp(),
-        rulesCount: increment(1),
-      },
-      { merge: true }
-    ).catch(() => {})
-
-    return docRef.id
-  } catch (err) {
-    console.warn("Could not save learned fact to Firestore, stored in local memory:", err)
-    return fallbackId
+    isBootstrapped = true
+    return true
+  } catch (error) {
+    console.error("⚠️ [ensureLearnedKnowledgeBootstrapped] שגיאה בבדיקה/אתחול הקולקציה:", error)
+    return false
   }
 }
 
 /**
- * שולף את כל הכללים הפעילים (isActive == true) ממוינים לפי חותמת זמן יורדת,
- * ומחזיר אותם כמערך מחרוזות נקי המוכן להזרקה לתוך ה-systemInstruction.
- *
- * @param limitCount כמות מקסימלית של כללים לשליפה (ברירת מחדל: 40)
+ * שולף את כל הכללים שבהם isActive == true ממוינים לפי createdAt desc ומחזיר מערך מחרוזות
  */
 export async function getActiveLearnedKnowledge(limitCount = 40): Promise<string[]> {
-  const records = await getActiveLearnedRecords(limitCount)
+  try {
+    const colRef = collection(serverDb, "learned_knowledge")
+    const q = query(
+      colRef,
+      where("isActive", "==", true),
+      firestoreLimit(limitCount * 2)
+    )
+    const snap = await getDocs(q)
 
-  return records.map((r, index) => {
-    const categoryHebrew: Record<LearnedCategory, string> = {
+    if (snap.empty) {
+      return []
+    }
+
+    const facts: LearnedFact[] = []
+    snap.forEach((d) => {
+      const data = d.data()
+      facts.push({
+        id: d.id,
+        rule: String(data.rule || ""),
+        category: String(data.category || "general"),
+        entity: String(data.entity || ""),
+        learnedFrom: String(data.learnedFrom || "rami_chat"),
+        isActive: Boolean(data.isActive),
+        createdAt: data.createdAt,
+      })
+    })
+
+    // מיון לפי createdAt יורד (החדש ביותר ראשון)
+    facts.sort((a, b) => {
+      const timeA = a.createdAt?.seconds || (a.createdAt instanceof Date ? a.createdAt.getTime() / 1000 : 0)
+      const timeB = b.createdAt?.seconds || (b.createdAt instanceof Date ? b.createdAt.getTime() / 1000 : 0)
+      return timeB - timeA
+    })
+
+    const categoryHebrew: Record<string, string> = {
       client: "לקוח / אתר",
       pricing: "תמחור / פקדונות",
       driver: "נהגים / משאיות",
@@ -316,52 +332,53 @@ export async function getActiveLearnedKnowledge(limitCount = 40): Promise<string
       general: "כללי / תפעול",
     }
 
-    const catBadge = categoryHebrew[r.category] || "כלל"
-    const entityPart = r.entity ? ` [ישות: ${r.entity}]` : ""
-    return `${index + 1}. [${catBadge}${entityPart}]: ${r.rule}`
-  })
+    return facts.slice(0, limitCount).map((r, index) => {
+      const catBadge = categoryHebrew[r.category] || r.category || "כלל"
+      const entityPart = r.entity ? ` [ישות: ${r.entity}]` : ""
+      return `${index + 1}. [${catBadge}${entityPart}]: ${r.rule}`
+    })
+  } catch (error) {
+    console.error("❌ [getActiveLearnedKnowledge] שגיאה בשליפת כללים מ-Firestore:", error)
+    return []
+  }
 }
 
 /**
- * שליפת רשומות הזיכרון המובנות המלאות מ-Firestore עם גיבוי מלא למקרה של חוסר אינדקס או אי-זמינות
+ * שליפת רשומות מלאות אם נדרש
  */
-export async function getActiveLearnedRecords(limitCount = 40): Promise<LearnedKnowledgeDoc[]> {
-  if (db) {
-    try {
-      const colRef = collection(db, "conversations", LEARNED_CONVERSATION_ID, LEARNED_SUBCOLLECTION)
+export async function getActiveLearnedRecords(limitCount = 40): Promise<LearnedFact[]> {
+  try {
+    const colRef = collection(serverDb, "learned_knowledge")
+    const q = query(
+      colRef,
+      where("isActive", "==", true),
+      firestoreLimit(limitCount * 2)
+    )
+    const snap = await getDocs(q)
+    const facts: LearnedFact[] = []
 
-      // ניסיון ראשון: שאילתה עם סינון isActive ומיון בזיכרון
-      const q = query(colRef, where("isActive", "==", true), firestoreLimit(limitCount * 2))
-      const snap = await getDocs(q)
-      if (!snap.empty) {
-        const list: LearnedKnowledgeDoc[] = []
-        snap.forEach((d) => {
-          const data = d.data()
-          list.push({
-            id: d.id,
-            rule: String(data.rule || ""),
-            category: (data.category as LearnedCategory) || "general",
-            entity: data.entity ? String(data.entity) : undefined,
-            learnedFrom: String(data.learnedFrom || "rami_chat"),
-            isActive: Boolean(data.isActive),
-            createdAt: data.createdAt,
-          })
-        })
+    snap.forEach((d) => {
+      const data = d.data()
+      facts.push({
+        id: d.id,
+        rule: String(data.rule || ""),
+        category: String(data.category || "general"),
+        entity: String(data.entity || ""),
+        learnedFrom: String(data.learnedFrom || "rami_chat"),
+        isActive: Boolean(data.isActive),
+        createdAt: data.createdAt,
+      })
+    })
 
-        // מיון מהחדש לישן
-        list.sort((a, b) => {
-          const timeA = (a.createdAt as any)?.seconds || (a.createdAt instanceof Date ? a.createdAt.getTime() / 1000 : 0)
-          const timeB = (b.createdAt as any)?.seconds || (b.createdAt instanceof Date ? b.createdAt.getTime() / 1000 : 0)
-          return timeB - timeA
-        })
+    facts.sort((a, b) => {
+      const timeA = a.createdAt?.seconds || (a.createdAt instanceof Date ? a.createdAt.getTime() / 1000 : 0)
+      const timeB = b.createdAt?.seconds || (b.createdAt instanceof Date ? b.createdAt.getTime() / 1000 : 0)
+      return timeB - timeA
+    })
 
-        return list.slice(0, limitCount)
-      }
-    } catch (err) {
-      console.warn("Could not retrieve learned knowledge from Firestore, using memory fallback:", err)
-    }
+    return facts.slice(0, limitCount)
+  } catch (err) {
+    console.error("❌ [getActiveLearnedRecords] שגיאה בשליפת רשומות:", err)
+    return []
   }
-
-  // החזרת הזיכרון המקומי כגיבוי
-  return inMemoryLearnedRules.filter((r) => r.isActive).slice(0, limitCount)
 }
