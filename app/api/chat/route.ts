@@ -6,6 +6,11 @@ import { buildProductMediaPrompt, buildTargetedProductMediaSnippet } from "@/lib
 import { sendOneSignalPush } from "@/lib/onesignal"
 import { db } from "@/lib/firebase-auth"
 import {
+  detectAndExtractLearningTrigger,
+  saveLearnedFact,
+  getActiveLearnedKnowledge,
+} from "@/lib/learned-memory"
+import {
   doc,
   getDoc,
   getDocs,
@@ -37,7 +42,7 @@ function getGenAI(): GoogleGenAI {
   return aiClient
 }
 
-export const STATIC_LOGISTICS_CATALOG = [
+const STATIC_LOGISTICS_CATALOG = [
   // --- אגרגטים ותפזורת בלות ---
   {
     sku: "11501",
@@ -619,6 +624,8 @@ async function generateWithProviderFallback(
 
   throw new Error("כל ספקי ה-AI (Gemini, OpenAI, Anthropic) מוצו או אינם זמינים כרגע.");
 }
+
+const generateMultiProviderFallback = generateWithProviderFallback;
 /**
  * POST /api/chat
  *
@@ -1013,6 +1020,40 @@ ${matchedTrainingVideos.slice(0, 2).map((v) => `* **${v.name}**
     const productMediaPrompt = await buildProductMediaPrompt()
     const targetedProductSnippet = await buildTargetedProductMediaSnippet(latestUserMessage)
 
+    // 🧠 מנגנון זיכרון ארוך-טווח ולמידה רציפה משיחה (Autonomous Long-Term Memory)
+    const learningTrigger = detectAndExtractLearningTrigger(latestUserMessage)
+    let learningConfirmationNote = ""
+
+    if (learningTrigger.isLearningTrigger && learningTrigger.cleanedRule) {
+      try {
+        await saveLearnedFact(
+          learningTrigger.cleanedRule,
+          learningTrigger.category,
+          learningTrigger.entity
+        )
+        learningConfirmationNote = `
+### ⚡ אירוע למידה בזמן אמת מהודעה זו:
+- ראמי לימד אותך כרגע כלל חדש: "${learningTrigger.cleanedRule}"
+- קטגוריה שסווגה: ${learningTrigger.category}${learningTrigger.entity ? ` | ישות מזוהה: ${learningTrigger.entity}` : ""}
+- הכלל נצרב ונשמר בהצלחה ב-Firestore בקולקציית learned_knowledge לכל השיחות הבאות.
+- **הנחיית אישור לראמי:** אשרי לו בחום ובביטחון שהכלל נצרב בזיכרון הקבוע שלך (למשל: "רשמתי לפניי וצרבתי בזיכרון הקבוע — החל מעכשיו אני איישם כלל זה בכל סידורי העבודה והמענה").`
+      } catch (err) {
+        console.warn("Error saving learned fact from chat route:", err)
+      }
+    }
+
+    // שליפת כל הכללים הפעילים מ-Firestore
+    const activeLearnedRules = await getActiveLearnedKnowledge(40)
+    let learnedMemoryPrompt = ""
+    if (activeLearnedRules.length > 0) {
+      learnedMemoryPrompt = `
+### 🧠 ידע מצטבר שנלמד משיחות קודמות עם ראמי (Learned Memory):
+להלן כללים עסקיים, עדכוני לקוחות, מחירונים והנחיות שטח שראמי לימד אותך ישירות בצ'אט לאורך הזמן. עליך לציית לכללים אלו בעדיפות עליונה בכל מענה וסידור עבודה:
+${activeLearnedRules.join("\n")}
+${learningConfirmationNote}
+`
+    }
+
     const verifiedIdentityBanner = verifiedUser
       ? `
 ### 🔒 זהות משתמש מאומתת (Device Binding מאושר ומאובטח בחומרה):
@@ -1040,6 +1081,7 @@ ${matchedTrainingVideos.slice(0, 2).map((v) => `* **${v.name}**
 את מתקשרת בערוץ הפרטי, הישיר והחופשי שלך מול ראמי וצוות ההנהלה והתפעול — לסיעור מוחות, פיתוח, ניהול משימות שוטף, סידור עבודה והחלטות אסטרטגיות.
 
 ${verifiedIdentityBanner}
+${learnedMemoryPrompt}
 ${oneSignalStatusNote}
 ${trainingVideosPrompt}
 ${targetedProductSnippet}
@@ -1217,7 +1259,9 @@ ${matchedClientPrompt}
    - במקום כותרות מסורבלות עם סולמיות (##), השתמשי בהדגשה חדה עם אימוג'י מוביל (לדוגמה: 📦 **פירוט כמויות ומק״טים:**).
    - ארגני את השורות במבנה נקי, קריא ונעים לעין, עם רווחים מדויקים ומרווח נשימה מאוזן שמתאים לקריאה מהירה גם במובייל וגם במחשב שולחני.
 3. הציגי תמיד את כרטיס הסידור וההזמנה בדיוק לפי המבנה שנקבע לעיל.
-4. בסוף כל מענה, הציגי בדיוק 3 כפתורי פעולה מהירים בהקשר השיחה (Quick Action Buttons):
+4. **אישור למידה בזיכרון ארוך-טווח (חובה):**
+   כאשר ראמי מבקש ממך לזכור עובדה או כלל חדש (באמצעות ביטויים כמו "תזכרי ש...", "כלל חדש:", "עדכון לקוח:", "תרשמי לפנייך:", "מעכשיו:"), אשרי לו תמיד בחום ובביטחון שהכלל נצרב בזיכרון הקבוע שלך (למשל: "רשמתי לפניי וצרבתי בזיכרון הקבוע — החל מעכשיו אני איישם כלל זה בכל סידורי העבודה והמענה").
+5. בסוף כל מענה, הציגי בדיוק 3 כפתורי פעולה מהירים בהקשר השיחה (Quick Action Buttons):
    🔘 \`[ 🚚 פעולה או שאלה מהירה 1 ]\`  
    🔘 \`[ 📊 פעולה או שאלה מהירה 2 ]\`  
    🔘 \`[ ☕ פעולה או שאלה מהירה 3 ]\`

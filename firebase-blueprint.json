@@ -166,6 +166,39 @@
         }
       },
       "required": ["userId", "name", "phone"]
+    },
+    "LearnedKnowledge": {
+      "title": "LearnedKnowledge",
+      "description": "Autonomous long-term business rules and operational facts learned from Rami in chat",
+      "type": "object",
+      "properties": {
+        "rule": {
+          "type": "string",
+          "description": "Content of the learned fact or rule"
+        },
+        "category": {
+          "type": "string",
+          "description": "Category of the learned rule",
+          "enum": ["client", "pricing", "driver", "safety", "general"]
+        },
+        "entity": {
+          "type": "string",
+          "description": "Entity name if applicable (e.g. client, driver, or warehouse name)"
+        },
+        "learnedFrom": {
+          "type": "string",
+          "description": "Source of learning, typically rami_chat"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether the rule is currently active and injected into memory"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Server timestamp when rule was learned"
+        }
+      },
+      "required": ["rule", "category", "learnedFrom", "isActive"]
     }
   },
   "firestore": {
@@ -188,6 +221,10 @@
     "/authorized_users/{userId}": {
       "schema": "AuthorizedUser",
       "description": "Authorized operators and device binding profiles"
+    },
+    "/learned_knowledge/{factId}": {
+      "schema": "LearnedKnowledge",
+      "description": "Autonomous learned memory facts and operational rules"
     }
   }
 }

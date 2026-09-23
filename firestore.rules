@@ -47,6 +47,11 @@ service cloud.firestore {
       }
     }
 
+    // קולקציית זיכרון נלמד ארוך-טווח (learned_knowledge)
+    match /learned_knowledge/{factId} {
+      allow read, write: if true;
+    }
+
     // כללי ברירת מחדל פתוחים לקריאה וכתיבה של נתוני האפליקציה
     match /{document=**} {
       allow read, write: if true;

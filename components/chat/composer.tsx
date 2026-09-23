@@ -461,7 +461,7 @@ export function Composer({
                 </span>
                 <span className="font-semibold text-amber-950">
                   {activeSku
-                    ? `שולפת נתוני מק"ט ${activeSku} ותמונת מוצר (מאגר מקומי + גיליון מילון_לוגיסטי)...`
+                    ? `אני על זה ראמי  ${activeSku} ותמונת מוצר (מאתרת)...`
                     : "מבצעת שאילתת מק\"ט במאגר המקומי ובגיליון מילון_לוגיסטי..."}
                 </span>
               </div>
