@@ -30,7 +30,8 @@ let aiClient: GoogleGenAI | null = null
 
 function getGenAI(): GoogleGenAI {
   if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEYS
+    const rawKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || ""
+    const apiKey = rawKeys.split(",")[0]?.trim() || process.env.GEMINI_API_KEY
     aiClient = new GoogleGenAI({
       apiKey,
       httpOptions: {
@@ -807,7 +808,11 @@ export async function POST(req: Request) {
     }
 
     // בדיקת קיום מפתח API כלשהו בסביבת השרת (Gemini / OpenAI / Anthropic)
-    const hasKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY
+    const hasKey =
+      process.env.GEMINI_API_KEYS ||
+      process.env.GEMINI_API_KEY ||
+      process.env.OPENAI_API_KEY ||
+      process.env.ANTHROPIC_API_KEY
 
     if (!hasKey) {
       return new Response(
@@ -1289,8 +1294,8 @@ ${matchedClientPrompt}
     let responseStream = null
     let lastStreamError: unknown = null
 
-    // 1. ניסיון קריאה ב-Gemini (אם מוגדר מפתח GEMINI_API_KEY)
-    if (process.env.GEMINI_API_KEY) {
+    // 1. ניסיון קריאה ב-Gemini (אם מוגדר מפתח GEMINI_API_KEYS או GEMINI_API_KEY)
+    if (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY) {
       try {
         const ai = getGenAI()
         const modelsToTry = [
@@ -1409,7 +1414,7 @@ ${matchedClientPrompt}
           console.warn("Streaming chunk iteration failed, trying direct fallback:", streamErr)
           if (!fullGeneratedText.trim()) {
             try {
-              if (process.env.GEMINI_API_KEY) {
+              if (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY) {
                 const ai = getGenAI()
                 for (const fallbackModel of ["gemini-flash-lite-latest", "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.8-flash"]) {
                   try {
