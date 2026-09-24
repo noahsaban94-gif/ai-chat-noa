@@ -30,7 +30,7 @@ let aiClient: GoogleGenAI | null = null
 
 function getGenAI(): GoogleGenAI {
   if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY
+    const apiKey = process.env.GEMINI_API_KEYS
     aiClient = new GoogleGenAI({
       apiKey,
       httpOptions: {
@@ -540,7 +540,7 @@ async function generateWithProviderFallback(
   systemInstruction: string,
   messages: ChatMessage[]
 ): Promise<string> {
-  // 1. ניסיון ראשי: Gemini
+  // 1. ניסיון ראשי: Gemini עם שרשרת מודלים זמינים
   if (process.env.GEMINI_API_KEY) {
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -549,15 +549,29 @@ async function generateWithProviderFallback(
         parts: [{ text: m.content }],
       }));
 
-      const res = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents,
-        config: { systemInstruction },
-      });
+      const fallbackModels = [
+        "gemini-flash-lite-latest",
+        "gemini-3.1-flash-lite",
+        "gemini-3.5-flash-lite",
+        "gemini-flash-latest",
+        "gemini-3.8-flash",
+      ];
 
-      if (res.text) return res.text;
-    } catch (err: any) {
-      console.warn("Gemini נכשל או חרג ממכסה (429/503), עובר ל-OpenAI...");
+      for (const mName of fallbackModels) {
+        try {
+          const res = await ai.models.generateContent({
+            model: mName,
+            contents,
+            config: { systemInstruction },
+          });
+
+          if (res.text) return res.text;
+        } catch {
+          // מנסה את המודל הבא ברשימה
+        }
+      }
+    } catch {
+      console.warn("Gemini provider fallback exhausted, moving to OpenAI...");
     }
   }
 
@@ -586,8 +600,8 @@ async function generateWithProviderFallback(
       if (res.ok && data.choices?.[0]?.message?.content) {
         return data.choices[0].message.content;
       }
-    } catch (err) {
-      console.warn("OpenAI נכשל או חרג ממכסה, עובר ל-Anthropic...");
+    } catch {
+      console.warn("OpenAI fallback failed, moving to Anthropic...");
     }
   }
 
@@ -618,12 +632,12 @@ async function generateWithProviderFallback(
       if (res.ok && data.content?.[0]?.text) {
         return data.content[0].text;
       }
-    } catch (err) {
-      console.error("גם Anthropic נכשל:", err);
+    } catch {
+      console.warn("Anthropic fallback failed");
     }
   }
 
-  throw new Error("כל ספקי ה-AI (Gemini, OpenAI, Anthropic) מוצו או אינם זמינים כרגע.");
+  return "";
 }
 
 const generateMultiProviderFallback = generateWithProviderFallback;
@@ -1279,7 +1293,14 @@ ${matchedClientPrompt}
     if (process.env.GEMINI_API_KEY) {
       try {
         const ai = getGenAI()
-        const modelsToTry = ["gemini-3.6-flash", "gemini-2.5-flash"]
+        const modelsToTry = [
+          "gemini-flash-lite-latest",
+          "gemini-3.1-flash-lite",
+          "gemini-3.5-flash-lite",
+          "gemini-flash-latest",
+          "gemini-3.8-flash",
+          "gemini-3.6-flash",
+        ]
 
         for (const modelName of modelsToTry) {
           for (let attempt = 0; attempt < 2; attempt++) {
@@ -1390,17 +1411,24 @@ ${matchedClientPrompt}
             try {
               if (process.env.GEMINI_API_KEY) {
                 const ai = getGenAI()
-                const directResponse = await ai.models.generateContent({
-                  model: "gemini-3.6-flash",
-                  contents,
-                  config: {
-                    systemInstruction,
-                  },
-                })
-                const directText = directResponse.text || ""
-                if (directText) {
-                  fullGeneratedText = directText
-                  controller.enqueue(encoder.encode(directText))
+                for (const fallbackModel of ["gemini-flash-lite-latest", "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.8-flash"]) {
+                  try {
+                    const directResponse = await ai.models.generateContent({
+                      model: fallbackModel,
+                      contents,
+                      config: {
+                        systemInstruction,
+                      },
+                    })
+                    const directText = directResponse.text || ""
+                    if (directText) {
+                      fullGeneratedText = directText
+                      controller.enqueue(encoder.encode(directText))
+                      break
+                    }
+                  } catch {
+                    // Try next model
+                  }
                 }
               }
             } catch (directErr) {

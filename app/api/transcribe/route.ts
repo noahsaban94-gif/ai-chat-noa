@@ -64,7 +64,13 @@ export async function POST(req: NextRequest) {
 6. אם ההקלטה שקטה לחלוטין או שאין בה דיבור, החזר מחרוזת ריקה.`
 
     // Robust multi-model fallback chain supporting audio transcription tasks
-    const candidateModels = ["gemini-3.5-transcribe", "gemini-3.8-flash", "gemini-3.6-flash"]
+    const candidateModels = [
+      "gemini-3.5-transcribe",
+      "gemini-flash-lite-latest",
+      "gemini-3.1-flash-lite",
+      "gemini-3.8-flash",
+      "gemini-3.6-flash",
+    ]
     let response: { text?: string | null } | null = null
     let lastError: unknown = null
 
