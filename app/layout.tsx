@@ -60,6 +60,12 @@ export const metadata: Metadata = {
       },
     ],
   },
+  verification: {
+    google: "628FdW8QNF-wHQVGmWN_2AGzUGE9z7CPeDpoWfvc2HU",
+  },
+  other: {
+    "google-site-verification": "628FdW8QNF-wHQVGmWN_2AGzUGE9z7CPeDpoWfvc2HU",
+  },
 }
 
 export const viewport: Viewport = {
@@ -79,6 +85,7 @@ export default function RootLayout({
   return (
     <html lang="he" dir="rtl">
       <head>
+        <meta name="google-site-verification" content="628FdW8QNF-wHQVGmWN_2AGzUGE9z7CPeDpoWfvc2HU" />
         {/* OneSignal Web Push - safely initialized only on configured origin */}
         <script
           dangerouslySetInnerHTML={{
