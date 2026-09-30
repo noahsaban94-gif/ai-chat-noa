@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { RotateCcw, Trash2, Sparkles, Database, ShieldCheck, ShieldAlert, Lock, CheckCircle2, Volume2, VolumeX } from "lucide-react"
+import { RotateCcw, Trash2, Sparkles, Database, ShieldCheck, ShieldAlert, Lock, CheckCircle2, Volume2, VolumeX, Boxes } from "lucide-react"
 import { MessageList } from "./message-list"
 import { Composer, type AIModel } from "./composer"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,7 @@ import { PWAInstallButton } from "@/components/pwa/pwa-install-button"
 import { OfflineIndicator } from "@/components/pwa/offline-indicator"
 import { DeviceAuthModal } from "./device-auth-modal"
 import { DevicePairingModal } from "./device-pairing-modal"
+import { VisualBranchBuilder } from "@/components/branch-builder/VisualBranchBuilder"
 import { useSpeech } from "@/hooks/use-speech"
 import { cn } from "@/lib/utils"
 import {
@@ -73,6 +74,7 @@ export function ChatShell() {
   const [selectedModel, setSelectedModel] = useState<AIModel>("google/gemini-2.0-flash-001")
   const [isLoaded, setIsLoaded] = useState(false)
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false)
+  const [activeView, setActiveView] = useState<"chat" | "branch_builder">("chat")
 
   // 🔒 Device Binding & Hardware Session State
   const [currentSession, setCurrentSession] = useState<DeviceSession | null>(null)
@@ -472,6 +474,15 @@ export function ChatShell() {
     }
   }, [messages.length, clearChat])
 
+  if (activeView === "branch_builder") {
+    return (
+      <VisualBranchBuilder
+        onBackToChat={() => setActiveView("chat")}
+        userName={currentSession ? currentSession.name : "ראמי מסארוה"}
+      />
+    )
+  }
+
   return (
     <div
       className="relative h-dvh bg-stone-50 overflow-hidden"
@@ -594,6 +605,21 @@ export function ChatShell() {
                 <span className="sm:hidden">קול</span>
               </>
             )}
+          </Button>
+
+          {/* Visual Branch Builder Button with Maia Mascot Companion */}
+          <Button
+            id="branch-builder-toggle-button"
+            onClick={() => setActiveView("branch_builder")}
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2.5 sm:px-3 rounded-full bg-gradient-to-r from-cyan-500/10 via-purple-500/10 to-pink-500/10 hover:from-cyan-500/20 hover:to-purple-500/20 text-purple-900 border border-purple-300/80 font-bold text-xs flex items-center gap-1.5 transition-all duration-200 active:scale-95 cursor-pointer shadow-2xs group"
+            title="פתיחת בונה הענפים הוויזואלי וליווי ע״י נועה (Maia AI)"
+            aria-label="בונה ענפים לוגיסטי"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-cyan-600 animate-spin" />
+            <span className="hidden sm:inline">בונה ענפים</span>
+            <span className="sm:hidden">ענפים</span>
           </Button>
 
           <Button
