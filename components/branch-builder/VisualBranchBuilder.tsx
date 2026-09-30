@@ -36,6 +36,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { NoaCanvasCompanion, type NoaCanvasCompanionHandle } from "./noa-canvas-companion"
+import { CanvasFlightSimulation } from "./CanvasFlightSimulation"
+import { WhatsAppReplySimulator } from "./WhatsAppReplySimulator"
 import { audioService } from "@/lib/audio-service"
 import { cn } from "@/lib/utils"
 
@@ -61,7 +63,102 @@ export interface WorkflowEdge {
   label?: string
 }
 
-// Initial workflow tailored specifically for H. Saban Building Materials
+// 4 ענפי הליבה הרשמיים של נועה AI עבור מענה ללקוחות בוואטסאפ (טקסט פרומפט Make.com)
+export const CORE_WHATSAPP_NODES: WorkflowNode[] = [
+  {
+    id: "node-hub",
+    title: "מרכזת פניות וואטסאפ (Make.com)",
+    subtitle: "פנייה נכנסת: {{1.name}} | {{1.from}}",
+    type: "intake",
+    status: "active",
+    assignee: "נועה AI ❤️",
+    details: [
+      "פנייה אישית בשם: 'שלום {{1.name}} 🏗️'",
+      "מענה תמציתי ומקצועי (עד 3-4 פסקאות קצרות)",
+      "עיצוב לוואטסאפ: כוכביות (*...*) ואימוג'ים מותאמים",
+      "סיום תמיד בשאלה מקדמת אחת",
+    ],
+    x: 60,
+    y: 220,
+    lastUpdated: "סנכרון Webhook פעיל",
+  },
+  {
+    id: "node-branch-materials",
+    title: "1. הזמנת חומרים והובלה לאתר",
+    subtitle: "אספקה מהירה | חכמת (מנוף) ועלי (פלטה)",
+    type: "warehouse_yard",
+    status: "idle",
+    assignee: "חכמת (מנוף) / עלי (פלטה)",
+    warehouse: "חצר 4 החרש",
+    details: [
+      "אספקה מהירה: ברזל, בלוקים, מלט, טיט, חול וסומסום",
+      "בירור מיד: כתובת אספקה מדויקת (עיר ורחוב)",
+      "בירור כמויות ושעת הגעה (סבב בוקר/צהריים)",
+      "ציון זמינות משאיות מנוף (חכמת) ופלטה (עלי)",
+    ],
+    x: 480,
+    y: 40,
+    lastUpdated: "ענף ליבה 1",
+  },
+  {
+    id: "node-branch-containers",
+    title: "2. שירות מכולות פסולת",
+    subtitle: "מכולות 6/8/12 קוב | משאית רמסע",
+    type: "transport",
+    status: "idle",
+    assignee: "מערך רמסע ופינוי פסולת",
+    details: [
+      "בירור פעולה: 📍 הצבה חדשה / 🔄 החלפה / 🚛 הוצאה ופינוי",
+      "בירור גודל: 📦 6 קוב / 📦 8 קוב / 📦 12 קוב",
+      "⚠️ תזכורת תפעולית: נדרשת גישה פנויה ורחבה לרמסע",
+    ],
+    x: 480,
+    y: 200,
+    lastUpdated: "ענף ליבה 2",
+  },
+  {
+    id: "node-branch-pickup",
+    title: "3. איסוף עצמי ושעות פעילות",
+    subtitle: "חצר המכר כפר ברא | ניווט Waze",
+    type: "warehouse_store",
+    status: "idle",
+    assignee: "חצר המכר (כפר ברא)",
+    warehouse: "חצר כפר ברא",
+    details: [
+      "א'–ה': 06:00–17:00 | ימי שישי: 06:00–13:00",
+      "מיקום: חצר המכר, אזור תעשייה כפר ברא",
+      "ניווט Waze: https://waze.com/ul?q=ח.סבן+כפר+ברא",
+    ],
+    x: 480,
+    y: 360,
+    lastUpdated: "ענף ליבה 3",
+  },
+  {
+    id: "node-branch-pricing",
+    title: "4. שאלות מחיר או בירור מורכב",
+    subtitle: "העברה אישית לראמי מסארווה (050-886-0896)",
+    type: "qa",
+    status: "idle",
+    assignee: "ראמי מסארווה (050-886-0896)",
+    details: [
+      "איסור מוחלט על המצאת מחירים סופיים",
+      "נוסח מחייב: 'העברתי את הפרטים לראמי מסארווה (050-886-0896)...'",
+      "חזרה תוך מספר דקות עם מחיר מדויק וסגירת אספקה",
+    ],
+    x: 480,
+    y: 520,
+    lastUpdated: "ענף ליבה 4",
+  },
+]
+
+export const CORE_WHATSAPP_EDGES: WorkflowEdge[] = [
+  { id: "edge-w1", from: "node-hub", to: "node-branch-materials", label: "1. חומרים והובלה" },
+  { id: "edge-w2", from: "node-hub", to: "node-branch-containers", label: "2. מכולות ופסולת" },
+  { id: "edge-w3", from: "node-hub", to: "node-branch-pickup", label: "3. איסוף ושעות" },
+  { id: "edge-w4", from: "node-hub", to: "node-branch-pricing", label: "4. מחיר ובירור" },
+]
+
+// Initial workflow tailored specifically for H. Saban Building Materials (Logistics Ops)
 const INITIAL_NODES: WorkflowNode[] = [
   {
     id: "node-intake",
@@ -141,9 +238,10 @@ interface VisualBranchBuilderProps {
 }
 
 export function VisualBranchBuilder({ onBackToChat, userName = "ראמי מסארוה" }: VisualBranchBuilderProps) {
-  const [nodes, setNodes] = useState<WorkflowNode[]>(INITIAL_NODES)
-  const [edges, setEdges] = useState<WorkflowEdge[]>(INITIAL_EDGES)
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>("node-yard")
+  const [workflowMode, setWorkflowMode] = useState<"whatsapp_core" | "logistics_ops">("whatsapp_core")
+  const [nodes, setNodes] = useState<WorkflowNode[]>(CORE_WHATSAPP_NODES)
+  const [edges, setEdges] = useState<WorkflowEdge[]>(CORE_WHATSAPP_EDGES)
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>("node-hub")
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isDraggingCanvas, setIsDraggingCanvas] = useState(false)
@@ -153,6 +251,36 @@ export function VisualBranchBuilder({ onBackToChat, userName = "ראמי מסא�
   const [isMuted, setIsMuted] = useState(audioService.isMuted())
   const [isProcessingAI, setIsProcessingAI] = useState(false)
   const [activeHighlightNodeId, setActiveHighlightNodeId] = useState<string | null>(null)
+  const [isSimulationOpen, setIsSimulationOpen] = useState(false)
+  const [isWhatsAppSimulatorOpen, setIsWhatsAppSimulatorOpen] = useState(false)
+
+  // Switch between 4 Core WhatsApp Branches and Logistics Operations
+  const handleSwitchWorkflow = (mode: "whatsapp_core" | "logistics_ops") => {
+    setWorkflowMode(mode)
+    if (mode === "whatsapp_core") {
+      setNodes(CORE_WHATSAPP_NODES)
+      setEdges(CORE_WHATSAPP_EDGES)
+      setSelectedNodeId("node-hub")
+    } else {
+      setNodes(INITIAL_NODES)
+      setEdges(INITIAL_EDGES)
+      setSelectedNodeId("node-yard")
+    }
+    audioService.playClick()
+  }
+
+  // Handle flight to branch from WhatsApp simulator
+  const handleSimulatorFly = (branchId: string, branchName: string) => {
+    if (workflowMode !== "whatsapp_core") {
+      setWorkflowMode("whatsapp_core")
+      setNodes(CORE_WHATSAPP_NODES)
+      setEdges(CORE_WHATSAPP_EDGES)
+    }
+    setSelectedNodeId(branchId)
+    setTimeout(() => {
+      executeNodeAction(branchId, "update_node", branchName)
+    }, 150)
+  }
 
   // Mascot Companion Ref
   const companionRef = useRef<NoaCanvasCompanionHandle>(null)
@@ -435,6 +563,49 @@ export function VisualBranchBuilder({ onBackToChat, userName = "ראמי מסא�
 
         {/* Center Actions Toolbar */}
         <div className="hidden md:flex items-center gap-1.5 bg-stone-800/80 p-1 rounded-xl border border-stone-700/60">
+          {/* Workflow Mode Selector */}
+          <div className="flex items-center bg-stone-950/80 p-0.5 rounded-lg border border-stone-700/60">
+            <button
+              type="button"
+              onClick={() => handleSwitchWorkflow("whatsapp_core")}
+              className={cn(
+                "px-2 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer",
+                workflowMode === "whatsapp_core"
+                  ? "bg-gradient-to-r from-emerald-500 to-cyan-500 text-stone-950 shadow-xs"
+                  : "text-stone-400 hover:text-stone-200"
+              )}
+            >
+              💬 4 ענפי וואטסאפ
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSwitchWorkflow("logistics_ops")}
+              className={cn(
+                "px-2 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer",
+                workflowMode === "logistics_ops"
+                  ? "bg-gradient-to-r from-cyan-500 to-purple-600 text-white shadow-xs"
+                  : "text-stone-400 hover:text-stone-200"
+              )}
+            >
+              📦 סידור תפעולי
+            </button>
+          </div>
+
+          <Button
+            onClick={() => {
+              if (workflowMode !== "whatsapp_core") {
+                handleSwitchWorkflow("whatsapp_core")
+              }
+              setIsWhatsAppSimulatorOpen(true)
+            }}
+            variant="default"
+            size="sm"
+            className="h-7 text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-stone-950 rounded-lg gap-1.5 cursor-pointer shadow-md shadow-emerald-500/20"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>סימולטור מענה וואטסאפ</span>
+          </Button>
+
           <Button
             onClick={() => {
               const newId = `node-${Date.now().toString(36)}`
@@ -466,7 +637,7 @@ export function VisualBranchBuilder({ onBackToChat, userName = "ראמי מסא�
               if (selectedNodeId) {
                 executeNodeAction(selectedNodeId, "update_node")
               } else {
-                executeNodeAction("node-yard", "update_node")
+                executeNodeAction(workflowMode === "whatsapp_core" ? "node-branch-materials" : "node-yard", "update_node")
               }
             }}
             disabled={isProcessingAI}
@@ -476,6 +647,17 @@ export function VisualBranchBuilder({ onBackToChat, userName = "ראמי מסא�
           >
             <Wand2 className="w-3.5 h-3.5 text-purple-400 animate-spin" />
             <span>שגר את נועה לבלוק</span>
+          </Button>
+
+          <Button
+            onClick={() => setIsSimulationOpen(true)}
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs font-semibold text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/60 rounded-lg gap-1.5 cursor-pointer"
+            title="פתיחת סימולציית טיסה מבודדת (כרטיס הזמנה #comax_20419)"
+          >
+            <Play className="w-3 h-3 text-cyan-400 fill-cyan-400" />
+            <span>סימולציית טיסה</span>
           </Button>
 
           <Button
@@ -720,39 +902,90 @@ export function VisualBranchBuilder({ onBackToChat, userName = "ראמי מסא�
             </div>
 
             {/* Quick Action Chips */}
-            <div className="p-3 border-b border-stone-800/60 bg-stone-950/40 space-y-1.5">
-              <div className="text-[10px] font-semibold text-stone-400">פעולות AI מהירות:</div>
-              <div className="flex flex-wrap gap-1.5">
+            <div className="p-3 border-b border-stone-800/60 bg-stone-950/40 space-y-2">
+              <div className="flex items-center justify-between text-[10px] font-semibold text-stone-400">
+                <span>ניווט מהיר בענפים:</span>
                 <button
                   type="button"
-                  onClick={() => executeNodeAction("node-yard", "update_node")}
-                  disabled={isProcessingAI}
-                  className="px-2 py-1 rounded-lg bg-stone-800/80 hover:bg-stone-700/80 border border-stone-700/60 text-[10px] font-medium text-amber-300 hover:text-amber-200 transition-colors flex items-center gap-1 cursor-pointer"
+                  onClick={() => setIsWhatsAppSimulatorOpen(true)}
+                  className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1"
                 >
-                  <Package className="w-2.5 h-2.5" />
-                  <span>עדכן ליקוט חצר (אורן)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => executeNodeAction("node-store", "update_node")}
-                  disabled={isProcessingAI}
-                  className="px-2 py-1 rounded-lg bg-stone-800/80 hover:bg-stone-700/80 border border-stone-700/60 text-[10px] font-medium text-cyan-300 hover:text-cyan-200 transition-colors flex items-center gap-1 cursor-pointer"
-                >
-                  <Boxes className="w-2.5 h-2.5" />
-                  <span>עדכן דלפק (שי)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => executeNodeAction("node-transport", "update_node")}
-                  disabled={isProcessingAI}
-                  className="px-2 py-1 rounded-lg bg-stone-800/80 hover:bg-stone-700/80 border border-stone-700/60 text-[10px] font-medium text-emerald-300 hover:text-emerald-200 transition-colors flex items-center gap-1 cursor-pointer"
-                >
-                  <Truck className="w-2.5 h-2.5" />
-                  <span>שבץ מנוף (חכמת)</span>
+                  <MessageSquare className="w-2.5 h-2.5" />
+                  <span>סימולטור וואטסאפ</span>
                 </button>
               </div>
+
+              {workflowMode === "whatsapp_core" ? (
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => executeNodeAction("node-branch-materials", "update_node", "1. הזמנת חומרים והובלה")}
+                    disabled={isProcessingAI}
+                    className="px-2 py-1 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-700/60 text-[10px] font-semibold text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>🏗️ 1. חומרים והובלה (חכמת/עלי)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => executeNodeAction("node-branch-containers", "update_node", "2. שירות מכולות פסולת")}
+                    disabled={isProcessingAI}
+                    className="px-2 py-1 rounded-lg bg-teal-950/60 hover:bg-teal-900/60 border border-teal-700/60 text-[10px] font-semibold text-teal-300 transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>🚛 2. מכולות ופסולת (רמסע)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => executeNodeAction("node-branch-pickup", "update_node", "3. איסוף עצמי ושעות")}
+                    disabled={isProcessingAI}
+                    className="px-2 py-1 rounded-lg bg-blue-950/60 hover:bg-blue-900/60 border border-blue-700/60 text-[10px] font-semibold text-blue-300 transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>🏬 3. איסוף עצמי (כפר ברא)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => executeNodeAction("node-branch-pricing", "update_node", "4. שאלות מחיר ובירור")}
+                    disabled={isProcessingAI}
+                    className="px-2 py-1 rounded-lg bg-purple-950/60 hover:bg-purple-900/60 border border-purple-700/60 text-[10px] font-semibold text-purple-300 transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>💰 4. בירור מחיר (ראמי)</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => executeNodeAction("node-yard", "update_node")}
+                    disabled={isProcessingAI}
+                    className="px-2 py-1 rounded-lg bg-stone-800/80 hover:bg-stone-700/80 border border-stone-700/60 text-[10px] font-medium text-amber-300 hover:text-amber-200 transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <Package className="w-2.5 h-2.5" />
+                    <span>עדכן ליקוט חצר (אורן)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => executeNodeAction("node-store", "update_node")}
+                    disabled={isProcessingAI}
+                    className="px-2 py-1 rounded-lg bg-stone-800/80 hover:bg-stone-700/80 border border-stone-700/60 text-[10px] font-medium text-cyan-300 hover:text-cyan-200 transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <Boxes className="w-2.5 h-2.5" />
+                    <span>עדכן דלפק (שי)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => executeNodeAction("node-transport", "update_node")}
+                    disabled={isProcessingAI}
+                    className="px-2 py-1 rounded-lg bg-stone-800/80 hover:bg-stone-700/80 border border-stone-700/60 text-[10px] font-medium text-emerald-300 hover:text-emerald-200 transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <Truck className="w-2.5 h-2.5" />
+                    <span>שבץ מנוף (חכמת)</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Selected Node Inspector or Guide */}
@@ -823,6 +1056,29 @@ export function VisualBranchBuilder({ onBackToChat, userName = "ראמי מסא�
           </motion.aside>
         )}
       </AnimatePresence>
+
+      {/* Flight Simulation Dialog Modal */}
+      <AnimatePresence>
+        {isSimulationOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="relative w-full max-w-3xl"
+            >
+              <CanvasFlightSimulation onClose={() => setIsSimulationOpen(false)} />
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* WhatsApp Customer Response Simulator (4 Core Branches) */}
+      <WhatsAppReplySimulator
+        isOpen={isWhatsAppSimulatorOpen}
+        onClose={() => setIsWhatsAppSimulatorOpen(false)}
+        onFlyToBranch={handleSimulatorFly}
+      />
     </div>
   )
 }

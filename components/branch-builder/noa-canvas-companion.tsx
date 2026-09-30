@@ -1,7 +1,7 @@
 "use client"
 
-import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } from "react"
-import { motion, AnimatePresence, useSpring } from "motion/react"
+import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef, useCallback } from "react"
+import { motion, AnimatePresence } from "motion/react"
 import { audioService } from "@/lib/audio-service"
 import { Sparkles, Wand2 } from "lucide-react"
 
@@ -21,7 +21,13 @@ export interface NoaCanvasCompanionHandle {
   say: (message: string, durationMs?: number) => void
 }
 
-interface NoaCanvasCompanionProps {
+export interface NoaCanvasCompanionProps {
+  /** Target position when controlled via props */
+  targetPosition?: { x: number; y: number } | null
+  /** Whether Noa is triggered to fly via props */
+  isFlying?: boolean
+  /** Callback fired when Noa arrives at the card */
+  onArrival?: () => void
   /** Initial home dock position relative to container or window */
   dockPosition?: { x: number; y: number }
   className?: string
@@ -29,7 +35,17 @@ interface NoaCanvasCompanionProps {
 }
 
 export const NoaCanvasCompanion = forwardRef<NoaCanvasCompanionHandle, NoaCanvasCompanionProps>(
-  ({ dockPosition = { x: 30, y: 110 }, className = "" }, ref) => {
+  (
+    {
+      targetPosition = null,
+      isFlying = false,
+      onArrival,
+      dockPosition = { x: 30, y: 110 },
+      className = "",
+      onAnimationComplete,
+    },
+    ref
+  ) => {
     // Current state
     const [state, setState] = useState<"idle" | "flying" | "casting" | "spinning" | "returning">("idle")
     const [expression, setExpression] = useState<CompanionExpression>("smile")
@@ -79,9 +95,9 @@ export const NoaCanvasCompanion = forwardRef<NoaCanvasCompanionHandle, NoaCanvas
       return () => clearTimeout(t)
     }, [speechBubble])
 
-    // Expose flyToTarget and other API methods via Ref
-    useImperativeHandle(ref, () => ({
-      flyToTarget: async (target: TargetPosition, onReach?: () => void) => {
+    // Reusable flight sequence
+    const executeFly = useCallback(
+      async (target: TargetPosition, onReach?: () => void) => {
         setActiveTarget(target)
         setState("flying")
         setExpression("focus")
@@ -146,6 +162,40 @@ export const NoaCanvasCompanion = forwardRef<NoaCanvasCompanionHandle, NoaCanvas
         setState("idle")
         setExpression("smile")
         setActiveTarget(null)
+        if (onAnimationComplete) {
+          onAnimationComplete()
+        }
+      },
+      [onAnimationComplete]
+    )
+
+    // Declarative trigger via props: isFlying + targetPosition
+    const lastTriggerRef = useRef(false)
+    useEffect(() => {
+      if (isFlying && !lastTriggerRef.current && targetPosition) {
+        lastTriggerRef.current = true
+        executeFly(
+          {
+            x: targetPosition.x,
+            y: targetPosition.y,
+            actionType: "update_node",
+            nodeTitle: "כרטיס יעד",
+          },
+          () => {
+            if (onArrival) {
+              onArrival()
+            }
+          }
+        ).finally(() => {
+          lastTriggerRef.current = false
+        })
+      }
+    }, [isFlying, targetPosition, onArrival, executeFly])
+
+    // Expose flyToTarget and other API methods via Ref
+    useImperativeHandle(ref, () => ({
+      flyToTarget: async (target: TargetPosition, onReach?: () => void) => {
+        return executeFly(target, onReach)
       },
 
       express: (exp: CompanionExpression, durationMs = 1500) => {

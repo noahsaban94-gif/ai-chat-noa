@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { RotateCcw, Trash2, Sparkles, Database, ShieldCheck, ShieldAlert, Lock, CheckCircle2, Volume2, VolumeX, Boxes } from "lucide-react"
+import { RotateCcw, Trash2, Sparkles, Database, ShieldCheck, ShieldAlert, Lock, CheckCircle2, Volume2, VolumeX, Boxes, MessageSquare } from "lucide-react"
 import { MessageList } from "./message-list"
 import { Composer, type AIModel } from "./composer"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,7 @@ import { OfflineIndicator } from "@/components/pwa/offline-indicator"
 import { DeviceAuthModal } from "./device-auth-modal"
 import { DevicePairingModal } from "./device-pairing-modal"
 import { VisualBranchBuilder } from "@/components/branch-builder/VisualBranchBuilder"
+import { WhatsAppReplySimulator } from "@/components/branch-builder/WhatsAppReplySimulator"
 import { useSpeech } from "@/hooks/use-speech"
 import { cn } from "@/lib/utils"
 import {
@@ -75,6 +76,7 @@ export function ChatShell() {
   const [isLoaded, setIsLoaded] = useState(false)
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false)
   const [activeView, setActiveView] = useState<"chat" | "branch_builder">("chat")
+  const [isWhatsAppSimulatorOpen, setIsWhatsAppSimulatorOpen] = useState(false)
 
   // 🔒 Device Binding & Hardware Session State
   const [currentSession, setCurrentSession] = useState<DeviceSession | null>(null)
@@ -622,6 +624,21 @@ export function ChatShell() {
             <span className="sm:hidden">ענפים</span>
           </Button>
 
+          {/* WhatsApp Customer Response Simulator (4 Core Branches) */}
+          <Button
+            id="whatsapp-simulator-toggle-button"
+            onClick={() => setIsWhatsAppSimulatorOpen(true)}
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2.5 sm:px-3 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 border border-emerald-400/50 font-bold text-xs flex items-center gap-1.5 transition-all duration-200 active:scale-95 cursor-pointer shadow-2xs group"
+            title="פתיחת סימולטור מענה וואטסאפ ללקוחות (4 ענפי הליבה)"
+            aria-label="מענה וואטסאפ ללקוחות"
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+            <span className="hidden sm:inline">מענה וואטסאפ</span>
+            <span className="sm:hidden">וואטסאפ</span>
+          </Button>
+
           <Button
             id="clear-history-button"
             onClick={handleStartNewSession}
@@ -778,6 +795,16 @@ export function ChatShell() {
           }}
         />
       )}
+
+      {/* WhatsApp Customer Response Simulator (4 Core Branches) */}
+      <WhatsAppReplySimulator
+        isOpen={isWhatsAppSimulatorOpen}
+        onClose={() => setIsWhatsAppSimulatorOpen(false)}
+        onFlyToBranch={() => {
+          setIsWhatsAppSimulatorOpen(false)
+          setActiveView("branch_builder")
+        }}
+      />
     </div>
   )
 }
