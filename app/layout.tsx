@@ -1,7 +1,8 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
-import { Toaster } from "sonner"
+import { SonnerToaster } from "@/components/ui/sonner-toaster"
+import { OneSignalInit } from "@/components/onesignal-init"
 import "./globals.css"
 
 const _geist = Geist({ subsets: ["latin"] })
@@ -84,63 +85,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="he" dir="rtl">
-      <head>
-        <meta name="google-site-verification" content="628FdW8QNF-wHQVGmWN_2AGzUGE9z7CPeDpoWfvc2HU" />
-        {/* OneSignal Web Push - safely initialized only on configured origin */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  window.addEventListener("error", function(e) {
-                    if (e && e.message && e.message.indexOf("Can only be used on") !== -1) {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      return true;
-                    }
-                  }, true);
-
-                  window.addEventListener("unhandledrejection", function(e) {
-                    var reason = e && (e.reason ? (typeof e.reason === "string" ? e.reason : (e.reason.message || "")) : "");
-                    if (reason && reason.indexOf("Can only be used on") !== -1) {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      return true;
-                    }
-                  }, true);
-
-                  var hostname = window.location.hostname;
-                  var isAllowedHost = hostname === "ai-chat-noa.vercel.app" || hostname === "localhost" || hostname === "127.0.0.1";
-                  if (!isAllowedHost) {
-                    return;
-                  }
-
-                  window.OneSignalDeferred = window.OneSignalDeferred || [];
-                  var script = document.createElement("script");
-                  script.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
-                  script.defer = true;
-                  document.head.appendChild(script);
-
-                  OneSignalDeferred.push(async function(OneSignal) {
-                    try {
-                      await OneSignal.init({
-                        appId: "8f9c9417-530c-41e2-8a65-850d10758258",
-                        allowLocalhostAsSecureOrigin: true,
-                        notifyButton: { enable: false }
-                      });
-                    } catch (initErr) {
-                    }
-                  });
-                } catch (err) {
-                }
-              })();
-            `,
-          }}
-        />
-      </head>
       <body className="font-sans antialiased">
+        <OneSignalInit />
         {children}
-        <Toaster position="top-center" richColors />
+        <SonnerToaster />
       </body>
     </html>
   )

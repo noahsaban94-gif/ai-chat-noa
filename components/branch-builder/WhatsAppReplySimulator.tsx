@@ -75,6 +75,32 @@ export function WhatsAppReplySimulator({ isOpen, onClose, onFlyToBranch }: Whats
   const [generatedResult, setGeneratedResult] = useState<WhatsAppReplyResponse | null>(null)
   const [isCopied, setIsCopied] = useState(false)
   const [showPromptCode, setShowPromptCode] = useState(false)
+  const [isPushingLive, setIsPushingLive] = useState(false)
+
+  const handlePushLiveToChat = async () => {
+    if (!clientText.trim()) return
+    setIsPushingLive(true)
+    audioService.playClick()
+    try {
+      const res = await fetch("/api/whatsapp/incoming", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: clientPhone || "054-8891234",
+          senderName: clientName || "לקוח וואטסאפ",
+          text: clientText,
+        }),
+      })
+      if (res.ok) {
+        audioService.playSuccess()
+        onClose()
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setIsPushingLive(false)
+    }
+  }
 
   if (!isOpen) return null
 
@@ -233,7 +259,7 @@ export function WhatsAppReplySimulator({ isOpen, onClose, onFlyToBranch }: Whats
           </div>
 
           {/* Action Button */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <Button
               onClick={handleGenerate}
               disabled={isGenerating || !clientText.trim()}
@@ -253,10 +279,21 @@ export function WhatsAppReplySimulator({ isOpen, onClose, onFlyToBranch }: Whats
             </Button>
 
             <Button
+              onClick={handlePushLiveToChat}
+              disabled={isPushingLive || !clientText.trim()}
+              variant="outline"
+              className="h-10 px-3 rounded-xl border-emerald-500/40 bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+              title="דחוף הודעה זו בזמן אמת לצ'אט — תופיע מיד בצד שמאל!"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>דחוף לצ'אט חי (Push) ⚡</span>
+            </Button>
+
+            <Button
               variant="outline"
               size="icon"
               onClick={() => setShowPromptCode(!showPromptCode)}
-              className="w-10 h-10 rounded-xl border-stone-700 text-stone-400 hover:text-stone-100 hover:bg-stone-800"
+              className="w-10 h-10 rounded-xl border-stone-700 text-stone-400 hover:text-stone-100 hover:bg-stone-800 shrink-0"
               title="הצג פרומפט רשמי ל-Make.com / Webhook"
             >
               <Code2 className="w-4 h-4" />

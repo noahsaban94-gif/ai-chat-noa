@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { RotateCcw, Trash2, Sparkles, Database, ShieldCheck, ShieldAlert, Lock, CheckCircle2, Volume2, VolumeX, Boxes, MessageSquare } from "lucide-react"
+import { RotateCcw, Trash2, Sparkles, Database, ShieldCheck, ShieldAlert, Lock, CheckCircle2, Volume2, VolumeX, Boxes, MessageSquare, Send } from "lucide-react"
+import { toast } from "sonner"
 import { MessageList } from "./message-list"
 import { Composer, type AIModel } from "./composer"
 import { Button } from "@/components/ui/button"
@@ -49,6 +50,34 @@ export interface Message {
   imageData?: string
   device?: "pc" | "samsung_mobile" | "whatsapp"
   isNormalizedOrder?: boolean
+  isIncomingWhatsApp?: boolean
+  senderName?: string
+  senderPhone?: string
+  whatsappStatus?: "sent" | "received" | "delivered" | "failed"
+  location?: { latitude: number; longitude: number } | null
+  wazeUrl?: string | null
+  recipientPhone?: string
+  recipientName?: string
+}
+
+// צליל התרעה פנימי לוואטסאפ (Web Audio API)
+function playWhatsAppChime() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+    if (!AudioContextClass) return
+    const ctx = new AudioContextClass()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = "sine"
+    osc.frequency.setValueAtTime(800, ctx.currentTime)
+    osc.frequency.exponentialRampToValueAtTime(1250, ctx.currentTime + 0.1)
+    gain.gain.setValueAtTime(0.25, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35)
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.start()
+    osc.stop(ctx.currentTime + 0.36)
+  } catch {}
 }
 
 // localStorage key for persisting messages
@@ -77,6 +106,11 @@ export function ChatShell() {
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false)
   const [activeView, setActiveView] = useState<"chat" | "branch_builder">("chat")
   const [isWhatsAppSimulatorOpen, setIsWhatsAppSimulatorOpen] = useState(false)
+
+  // 💬 WhatsApp Realtime Live State
+  const [activeWhatsAppRecipient, setActiveWhatsAppRecipient] = useState<{ name: string; phone: string } | null>(null)
+  const [isWhatsAppLiveConnected, setIsWhatsAppLiveConnected] = useState(false)
+  const [isSimulatingIncoming, setIsSimulatingIncoming] = useState(false)
 
   // 🔒 Device Binding & Hardware Session State
   const [currentSession, setCurrentSession] = useState<DeviceSession | null>(null)
@@ -183,6 +217,193 @@ export function ChatShell() {
 
     return () => {
       if (unsubscribe) unsubscribe()
+    }
+  }, [])
+
+  // 📡 Real-time WhatsApp SSE Listener
+  // דחיפה בזמן אמת של הודעות וואטסאפ מהשרת ישירות לצ'אט (מוצגת בצד שמאל כמו לקוח)
+  useEffect(() => {
+    let eventSource: EventSource | null = null
+    let reconnectTimeout: NodeJS.Timeout | null = null
+
+    function connectSSE() {
+      try {
+        eventSource = new EventSource("/api/whatsapp/events")
+
+        eventSource.onopen = () => {
+          setIsWhatsAppLiveConnected(true)
+        }
+
+        eventSource.onmessage = (event) => {
+          try {
+            if (!event.data || event.data.startsWith(":")) return
+            const payload = JSON.parse(event.data)
+
+            if (payload.type === "message" && payload.message) {
+              const liveMsg = payload.message
+
+              // רק הודעות נכנסות מלקוחות וואטסאפ שלא קיימות עדיין
+              if (liveMsg.direction === "incoming") {
+                setMessages((prev) => {
+                  if (prev.some((m) => m.id === liveMsg.id)) {
+                    return prev
+                  }
+
+                  playWhatsAppChime()
+
+                  const incomingMsg: Message = {
+                    id: liveMsg.id,
+                    role: "user",
+                    content: liveMsg.text,
+                    createdAt: new Date(liveMsg.timestamp),
+                    device: "whatsapp",
+                    isIncomingWhatsApp: true,
+                    senderName: liveMsg.senderName,
+                    senderPhone: liveMsg.phone,
+                    whatsappStatus: "received",
+                    location: liveMsg.location,
+                    wazeUrl: liveMsg.wazeUrl,
+                  }
+
+                  return [...prev, incomingMsg]
+                })
+
+                // חיבור מיידי של שורת הכתיבה למענה ישיר לוואטסאפ של הלקוח
+                setActiveWhatsAppRecipient({
+                  name: liveMsg.senderName,
+                  phone: liveMsg.phone,
+                })
+
+                toast.success(`💬 פנייה נכנסת מוואטסאפ: ${liveMsg.senderName}`, {
+                  description: liveMsg.text ? (liveMsg.text.length > 60 ? liveMsg.text.slice(0, 60) + "..." : liveMsg.text) : "📍 מיקום GPS",
+                })
+              } else if (liveMsg.direction === "outgoing") {
+                // הודעה יוצאת שנשלחה ללקוח
+                setMessages((prev) => {
+                  if (prev.some((m) => m.id === liveMsg.id)) {
+                    return prev
+                  }
+                  const outgoingMsg: Message = {
+                    id: liveMsg.id,
+                    role: "user",
+                    content: liveMsg.text,
+                    createdAt: new Date(liveMsg.timestamp),
+                    device: "whatsapp",
+                    whatsappStatus: "sent",
+                    recipientName: liveMsg.senderName || "לקוח",
+                    recipientPhone: liveMsg.phone,
+                  }
+                  return [...prev, outgoingMsg]
+                })
+              }
+            }
+          } catch (err) {
+            console.warn("Error processing WhatsApp SSE event:", err)
+          }
+        }
+
+        eventSource.onerror = () => {
+          setIsWhatsAppLiveConnected(false)
+          if (eventSource) {
+            eventSource.close()
+            eventSource = null
+          }
+          reconnectTimeout = setTimeout(connectSSE, 4000)
+        }
+      } catch {
+        setIsWhatsAppLiveConnected(false)
+        reconnectTimeout = setTimeout(connectSSE, 4000)
+      }
+    }
+
+    connectSSE()
+
+    return () => {
+      if (eventSource) eventSource.close()
+      if (reconnectTimeout) clearTimeout(reconnectTimeout)
+    }
+  }, [])
+
+  // 📤 שיגור תשובת מנהל מהצ'אט ישירות לוואטסאפ של הלקוח
+  const handleSendWhatsAppReply = useCallback(
+    async (phone: string, text: string): Promise<boolean> => {
+      const recipientName = activeWhatsAppRecipient?.name || "לקוח"
+      const managerName = currentSession?.name || "ראמי מסארוה"
+
+      // 1. הוספה מקומית מיידית לצ'אט בצד ימין כהודעת מנהל
+      const outgoingId = generateId()
+      const outgoingMsg: Message = {
+        id: outgoingId,
+        role: "user",
+        content: text,
+        createdAt: new Date(),
+        device: "whatsapp",
+        whatsappStatus: "sent",
+        recipientName,
+        recipientPhone: phone,
+      }
+      setMessages((prev) => [...prev, outgoingMsg])
+
+      try {
+        // 2. שליחה לשרת שמשגר מיד לוואטסאפ של הלקוח
+        const res = await fetch("/api/whatsapp/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phone,
+            text,
+            customerName: recipientName,
+            senderName: managerName,
+          }),
+        })
+
+        const data = await res.json().catch(() => ({}))
+
+        if (res.ok && data.success) {
+          toast.success(`🚀 ההודעה שוגרה מיד לוואטסאפ של ${recipientName}!`)
+          return true
+        } else {
+          if (data.waMeFallbackUrl) {
+            toast.info(`נשמר במערכת! ניתן לשגר ישירות ב-WhatsApp Web`, {
+              action: {
+                label: "פתח ב-WhatsApp",
+                onClick: () => window.open(data.waMeFallbackUrl, "_blank"),
+              },
+            })
+          } else {
+            toast.error(data.error || "ההודעה נרשמה אך שרת הוואטסאפ לא היה זמין")
+          }
+          return false
+        }
+      } catch (err) {
+        console.error("Error sending WhatsApp reply:", err)
+        toast.error("שגיאת תקשורת בשיגור ההודעה לוואטסאפ")
+        return false
+      }
+    },
+    [activeWhatsAppRecipient, currentSession]
+  )
+
+  // 🧪 כפתור הדמיית פנייה נכנסת מוואטסאפ (לבדיקת ה-Push בזמן אמת)
+  const handleSimulateIncomingWhatsApp = useCallback(async () => {
+    setIsSimulatingIncoming(true)
+    try {
+      const res = await fetch("/api/whatsapp/simulate-incoming", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: "054-8891234",
+          senderName: "איציק קבלן (אתר הוד השרון)",
+          text: "שלום ראמי, אני צריך דחוף לסבב בוקר 4 בלות חול ומשטח מלט לאתר ברחוב הבנים 12 בהוד השרון. יש מנוף פנוי?",
+        }),
+      })
+      if (res.ok) {
+        toast.success("📥 פניית לקוח חדשה נדחפה בזמן אמת לשרת ולמסך הצ'אט!")
+      }
+    } catch {
+      toast.error("שגיאה בהדמיית פניית וואטסאפ")
+    } finally {
+      setIsSimulatingIncoming(false)
     }
   }, [])
 
@@ -624,6 +845,44 @@ export function ChatShell() {
             <span className="sm:hidden">ענפים</span>
           </Button>
 
+          {/* WhatsApp Live Real-time Status Badge */}
+          <div
+            className={cn(
+              "hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors select-none",
+              isWhatsAppLiveConnected
+                ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                : "bg-stone-100 text-stone-500 border-stone-200"
+            )}
+            title={
+              isWhatsAppLiveConnected
+                ? "ערוץ Push בזמן אמת פעיל (SSE) — כל פנייה של לקוח בוואטסאפ מוזרקת מיד למסך בצד שמאל!"
+                : "מתחבר לערוץ Push אירועים חי של וואטסאפ..."
+            }
+          >
+            <span
+              className={cn(
+                "w-2 h-2 rounded-full",
+                isWhatsAppLiveConnected ? "bg-emerald-500 animate-pulse" : "bg-stone-400"
+              )}
+            />
+            <span>וואטסאפ חי</span>
+          </div>
+
+          {/* Simulate incoming WhatsApp message button for instant testing of real-time push */}
+          <Button
+            id="simulate-incoming-whatsapp-button"
+            onClick={handleSimulateIncomingWhatsApp}
+            disabled={isSimulatingIncoming}
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2 sm:px-2.5 rounded-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 border border-amber-400/50 font-bold text-xs flex items-center gap-1 transition-all duration-200 active:scale-95 cursor-pointer shadow-2xs"
+            title="בדוק דחיפה בזמן אמת: השרת מדמה קבלת הודעה מלקוח ודוחף אותה מיד לצד שמאל!"
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-amber-600" />
+            <span className="hidden md:inline">הדמיית הודעה נכנסת</span>
+            <span className="md:hidden">בדיקת Push</span>
+          </Button>
+
           {/* WhatsApp Customer Response Simulator (4 Core Branches) */}
           <Button
             id="whatsapp-simulator-toggle-button"
@@ -692,6 +951,7 @@ export function ChatShell() {
           speakingMessageId={speakingMessageId}
           isLoadingSpeech={isLoadingSpeech}
           onToggleSpeech={speak}
+          onReplyWhatsApp={(phone, name) => setActiveWhatsAppRecipient({ name, phone })}
         />
       </div>
 
@@ -707,6 +967,9 @@ export function ChatShell() {
         onModelChange={handleModelChange}
         isSkuSearching={isSkuSearching}
         searchingSku={searchingSku}
+        activeWhatsAppRecipient={activeWhatsAppRecipient}
+        onClearWhatsAppRecipient={() => setActiveWhatsAppRecipient(null)}
+        onSendWhatsAppReply={handleSendWhatsAppReply}
       />
 
       <OfflineIndicator />

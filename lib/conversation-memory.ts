@@ -281,6 +281,14 @@ export function messageDocumentToUIMessage(doc: MessageDocument): {
   createdAt: Date
   device?: DeviceType
   isNormalizedOrder?: boolean
+  isIncomingWhatsApp?: boolean
+  senderName?: string
+  senderPhone?: string
+  whatsappStatus?: "sent" | "received" | "delivered" | "failed"
+  location?: { latitude: number; longitude: number } | null
+  wazeUrl?: string | null
+  recipientPhone?: string
+  recipientName?: string
 } {
   let createdDate = new Date()
   if (doc.timestamp) {
@@ -291,13 +299,25 @@ export function messageDocumentToUIMessage(doc: MessageDocument): {
     }
   }
 
+  const orderData = doc.orderData as Record<string, any> | undefined
+  const isIncomingWhatsApp = Boolean(orderData?.isIncomingCustomerMessage)
+  const isWhatsAppDispatched = Boolean(orderData?.dispatchedToWhatsApp)
+
   return {
     id: doc.id || `msg_${Math.random().toString(36).substring(2, 9)}`,
-    role: doc.role === "model" ? "assistant" : "user",
+    role: isIncomingWhatsApp ? "user" : (doc.role === "model" ? "assistant" : "user"),
     content: doc.text,
     createdAt: createdDate,
     device: doc.device,
     isNormalizedOrder: doc.isNormalizedOrder,
+    isIncomingWhatsApp,
+    senderName: orderData?.whatsappSender as string | undefined,
+    senderPhone: orderData?.whatsappPhone as string | undefined,
+    whatsappStatus: isIncomingWhatsApp ? "received" : isWhatsAppDispatched ? "sent" : undefined,
+    location: (orderData?.location as { latitude: number; longitude: number } | null) || null,
+    wazeUrl: (orderData?.wazeUrl as string | null) || null,
+    recipientPhone: orderData?.recipientPhone as string | undefined,
+    recipientName: orderData?.recipientName as string | undefined,
   }
 }
 

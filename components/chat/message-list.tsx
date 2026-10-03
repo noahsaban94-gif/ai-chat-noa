@@ -18,6 +18,7 @@ interface MessageListProps {
   speakingMessageId?: string | null
   isLoadingSpeech?: boolean
   onToggleSpeech?: (messageId: string, text: string) => void
+  onReplyWhatsApp?: (phone: string, name: string) => void
 }
 
 function getDayKey(date: Date | string | number | undefined): string {
@@ -68,6 +69,7 @@ export function MessageList({
   speakingMessageId,
   isLoadingSpeech,
   onToggleSpeech,
+  onReplyWhatsApp,
 }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -253,14 +255,30 @@ export function MessageList({
                   </div>
                 </div>
               )}
-              <MessageBubble
-                message={message}
-                isStreaming={isStreaming && message.role === "assistant" && message === lastMessage}
-                onActionClick={onSendMessage}
-                isSpeaking={speakingMessageId === message.id}
-                isLoadingSpeech={isLoadingSpeech && speakingMessageId === message.id}
-                onToggleSpeech={onToggleSpeech}
-              />
+              {/* מכולה עם יישור פיזי: הודעת לקוח וואטסאפ נכנסת בצד שמאל (justify-start ב-ltr), מענה מנהל בצד ימין (justify-end) */}
+              <div
+                className={cn(
+                  "w-full flex",
+                  message.isIncomingWhatsApp
+                    ? "justify-start" // צד שמאל פיזית - כמו לקוח
+                    : message.role === "user"
+                    ? "justify-end" // צד ימין פיזית - מענה מנהל
+                    : "justify-start"
+                )}
+                dir="ltr"
+              >
+                <div dir="rtl" className="w-fit max-w-[95%] md:max-w-[85%]">
+                  <MessageBubble
+                    message={message}
+                    isStreaming={isStreaming && message.role === "assistant" && message === lastMessage}
+                    onActionClick={onSendMessage}
+                    isSpeaking={speakingMessageId === message.id}
+                    isLoadingSpeech={isLoadingSpeech && speakingMessageId === message.id}
+                    onToggleSpeech={onToggleSpeech}
+                    onReplyWhatsApp={onReplyWhatsApp}
+                  />
+                </div>
+              </div>
             </div>
           )
         })

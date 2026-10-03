@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useRef, useCallback, type KeyboardEvent, useEffect } from "react"
-import { Square, Mic, MicOff, Brain, Paperclip, X, Loader2, Search } from "lucide-react"
+import { Square, Mic, MicOff, Brain, Paperclip, X, Loader2, Search, MessageSquare, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { extractSkuFromText } from "@/lib/product-data-service"
@@ -35,6 +35,9 @@ interface ComposerProps {
   onModelChange: (model: AIModel) => void
   isSkuSearching?: boolean
   searchingSku?: string | null
+  activeWhatsAppRecipient?: { name: string; phone: string } | null
+  onClearWhatsAppRecipient?: () => void
+  onSendWhatsAppReply?: (phone: string, text: string) => Promise<boolean>
 }
 
 export function Composer({
@@ -46,10 +49,14 @@ export function Composer({
   onModelChange,
   isSkuSearching = false,
   searchingSku = null,
+  activeWhatsAppRecipient = null,
+  onClearWhatsAppRecipient,
+  onSendWhatsAppReply,
 }: ComposerProps) {
   const [value, setValue] = useState("")
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
+  const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false)
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [showImageBounce, setShowImageBounce] = useState(false)
   const [hasAnimated, setHasAnimated] = useState(false)
@@ -331,9 +338,29 @@ export function Composer({
     }
   }, [isRecording, value, playClickSound, playRecordSound, stopActiveRecording, initRecognition])
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     if ((!value.trim() && !uploadedImage) || isStreaming || disabled) return
     playClickSound()
+
+    // במצב מענה ישיר לוואטסאפ של לקוח
+    if (activeWhatsAppRecipient && onSendWhatsAppReply) {
+      const textToSend = value.trim()
+      if (!textToSend) return
+      setIsSendingWhatsApp(true)
+      setValue("")
+      setUploadedImage(null)
+      baseTextRef.current = ""
+      speechRecognitionTextRef.current = ""
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto"
+      }
+      try {
+        await onSendWhatsAppReply(activeWhatsAppRecipient.phone, textToSend)
+      } finally {
+        setIsSendingWhatsApp(false)
+      }
+      return
+    }
 
     if (previewSku) {
       setLocalSearching(true)
@@ -352,7 +379,7 @@ export function Composer({
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto"
     }
-  }, [value, uploadedImage, isStreaming, disabled, onSend, isRecording, playClickSound, previewSku])
+  }, [value, uploadedImage, isStreaming, disabled, onSend, isRecording, playClickSound, previewSku, activeWhatsAppRecipient, onSendWhatsAppReply])
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -485,6 +512,30 @@ export function Composer({
             </div>
           )}
 
+          {/* Active WhatsApp Recipient Banner */}
+          {activeWhatsAppRecipient && (
+            <div className="flex items-center justify-between px-3.5 py-1.5 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-900 shadow-2xs animate-in fade-in" dir="rtl">
+              <div className="flex items-center gap-2 font-bold">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-emerald-800 flex items-center gap-1">
+                  <MessageSquare className="w-3.5 h-3.5 text-emerald-600 inline" />
+                  <span>מענה ישיר לוואטסאפ:</span>
+                </span>
+                <span className="text-emerald-950 font-black">{activeWhatsAppRecipient.name}</span>
+                <span className="font-mono text-emerald-700 text-[11px] font-normal">({activeWhatsAppRecipient.phone})</span>
+              </div>
+              {onClearWhatsAppRecipient && (
+                <button
+                  type="button"
+                  onClick={onClearWhatsAppRecipient}
+                  className="text-stone-400 hover:text-stone-700 text-[11px] font-medium px-2 py-0.5 rounded cursor-pointer hover:bg-emerald-100/60 transition-colors"
+                >
+                  ✕ בטל
+                </button>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-2 items-center">
             {uploadedImage && (
               <div className={cn("relative shrink-0", showImageBounce && "image-bounce")}>
@@ -516,7 +567,9 @@ export function Composer({
               }}
               onKeyDown={handleKeyDown}
               placeholder={
-                isQueryingSku
+                activeWhatsAppRecipient
+                  ? `הקלד תשובה שתשוגר מיד לוואטסאפ של ${activeWhatsAppRecipient.name}... (Enter לשליחה)`
+                  : isQueryingSku
                   ? `שולפת נתונים ותמונה עבור מק"ט ${activeSku || ""} ממקור הנתונים...`
                   : isRecording
                     ? "מקשיבה לך ראמי... (דבר בחופשיות)"
@@ -531,7 +584,8 @@ export function Composer({
                 "flex-1 resize-none bg-transparent px-3.5 py-2.5 text-sm text-stone-800 placeholder:text-stone-400 text-right",
                 "focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed",
                 "min-h-[56px] max-h-[220px] border border-stone-200/80 rounded-2xl overflow-y-auto transition-[height] duration-150 ease-out",
-                isQueryingSku && "border-amber-400/70 bg-amber-50/20"
+                isQueryingSku && "border-amber-400/70 bg-amber-50/20",
+                activeWhatsAppRecipient && "border-emerald-400/80 bg-emerald-50/20 focus:border-emerald-500"
               )}
               style={{
                 minHeight: "56px",
@@ -549,7 +603,32 @@ export function Composer({
               </div>
             )}
 
-            {isStreaming ? (
+            {activeWhatsAppRecipient ? (
+              <button
+                onClick={handleSend}
+                disabled={!value.trim() || disabled || isSendingWhatsApp}
+                className={cn(
+                  "h-9 px-3 rounded-full flex items-center gap-1.5 font-bold text-xs transition-all shadow-sm shrink-0",
+                  !value.trim() || disabled || isSendingWhatsApp
+                    ? "bg-stone-200 text-stone-400 cursor-not-allowed opacity-50"
+                    : "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-95 shadow-emerald-500/20"
+                )}
+                title={`שגר מיד לוואטסאפ של ${activeWhatsAppRecipient.name}`}
+                aria-label="Send to WhatsApp"
+              >
+                {isSendingWhatsApp ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>משגר...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5 rotate-180" />
+                    <span>שלח לוואטסאפ</span>
+                  </>
+                )}
+              </button>
+            ) : isStreaming ? (
               <button
                 onClick={() => {
                   playClickSound()

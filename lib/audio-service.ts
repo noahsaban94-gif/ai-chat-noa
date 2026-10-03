@@ -148,6 +148,33 @@ class AudioService {
       // Audio error silent fallback
     }
   }
+
+  public playClick() {
+    const ctx = this.getContext()
+    if (!ctx) return
+    try {
+      const now = ctx.currentTime
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = "sine"
+      osc.frequency.setValueAtTime(700, now)
+      osc.frequency.exponentialRampToValueAtTime(350, now + 0.04)
+      gain.gain.setValueAtTime(0.03, now)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start(now)
+      osc.stop(now + 0.04)
+    } catch {}
+  }
+
+  public playMagicSpark() {
+    this.playMagicSparkle()
+  }
+
+  public playSuccess() {
+    this.playSuccessChime()
+  }
 }
 
 export const audioService = new AudioService()
