@@ -40,7 +40,7 @@ export interface WhatsAppReplyResponse {
 /**
  * זיהוי ענף הליבה המתאים ביותר לפי תוכן ההודעה של הלקוח
  */
-export function detectCoreBranch(text: string): { branch: WhatsAppBranchType; branchName: string; targetNodeId: string } {
+function detectCoreBranch(text: string): { branch: WhatsAppBranchType; branchName: string; targetNodeId: string } {
   const t = text.toLowerCase()
 
   // 1. שאלות מחיר או בירור מורכב
@@ -118,7 +118,7 @@ export function detectCoreBranch(text: string): { branch: WhatsAppBranchType; br
  * מחולל מענה מגובה כללים (Fallback Rule-based Engine)
  * מבטיח מענה איכותי, מעוצב ומדויק גם אם אין מפתח API זמין או במקרה של שגיאת רשת
  */
-export function generateDeterministicReply(name: string, text: string, branch: WhatsAppBranchType): string {
+function generateDeterministicReply(name: string, text: string, branch: WhatsAppBranchType): string {
   const safeName = name?.trim() || "חבר"
   const header = `שלום ${safeName} 🏗️`
 
@@ -167,7 +167,7 @@ https://waze.com/ul?q=ח.סבן+כפר+ברא
 /**
  * יצירת ה-Prompt הרשמי של נועה AI לפי 4 ענפי הליבה
  */
-export function buildPromptTemplate(name: string, from: string, text: string): string {
+function buildPromptTemplate(name: string, from: string, text: string): string {
   return `אתה נועה AI — מנהלת הסידור והשירות של "ח. סבן חומרי בניין (1994) בע״מ" ויד ימינו של ראמי מסארווה.
 
 פרטי הפנייה הנכנסת:
